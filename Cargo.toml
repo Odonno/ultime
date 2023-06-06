@@ -6,4 +6,11 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-clap = "4.3.0"
+anyhow = "1.0.71"
+clap = { version = "4.3.0", features = ["derive"] }
+include_dir = "0.7.3"
+minijinja = "0.34.0"
+
+[dev-dependencies]
+assert_cmd = "2.0.11"
+assert_fs = "1.0.13"
