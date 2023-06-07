@@ -13,9 +13,11 @@ fn create_new_project_with_blog_template() -> Result<()> {
     let mut cmd = create_cmd()?;
     cmd.current_dir(&temp_dir).arg("new").arg("my-blog");
 
-    cmd.assert()
-        .success()
-        .stdout("Creating new project: my-blog\n");
+    cmd.assert().success().stdout(
+        "Cloning template...
+Creating migration project...
+Creating new project: my-blog\n",
+    );
 
     let my_blog_folder = temp_dir.child("my-blog");
     assert!(my_blog_folder.is_dir(), "my-blog dir should exists");
@@ -33,6 +35,32 @@ edition = "2021"
 
 [dependencies]
 leptos = "0.3.0""#,
+        );
+    }
+
+    {
+        let index_html_file = my_blog_folder.child("index.html");
+        assert!(index_html_file.is_file(), "index.html file should exists");
+        index_html_file.assert(
+            r#"<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>my-blog</title>
+    <link data-trunk rel="rust" data-wasm-opt="0" data-keep-debug="true" />
+  </head>
+  <body></body>
+</html>"#,
+        );
+    }
+
+    {
+        let gitignore_file = my_blog_folder.child(".gitignore");
+        assert!(gitignore_file.is_file(), ".gitignore file should exists");
+        gitignore_file.assert(
+            r#"/target
+/.cargo
+"#,
         );
     }
 

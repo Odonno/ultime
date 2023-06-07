@@ -46,111 +46,143 @@ pub fn main(name: String) -> Result<()> {
 fn create_project_dir(from: &Dir, to: &Path, name: &str) -> Result<()> {
     let now = Local::now();
 
-    extract(from, to)?;
-
-    let cargo_toml_jinja2_path = to.join("Cargo.toml.jinja2");
-    let cargo_toml_jinja2_content = fs::read_to_string(&cargo_toml_jinja2_path)?;
-
-    let mut env = Environment::new();
-    env.add_template("Cargo.toml", &cargo_toml_jinja2_content)?;
-    let cargo_toml_template = env.get_template("Cargo.toml")?;
-
-    let cargo_toml_content = cargo_toml_template.render(context! { name })?;
-    let cargo_toml_path = to.join("Cargo.toml");
-
-    // Create file
-    let mut fsf = fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(&cargo_toml_path)?;
-    fsf.write_all(cargo_toml_content.as_bytes())?;
-    fsf.sync_all()?;
-
-    // Remove jinja2 file
-    fs::remove_file(cargo_toml_jinja2_path)?;
-
-    // Rename files in migrations folder
-    let regex = regex::Regex::new(r"^YYYYMMDD_HHMM(\d{2})_")?;
-
-    let migrations_dir_path = to.join("migrations");
-    let migrations_dir = fs::read_dir(&migrations_dir_path)?;
-
-    let migration_filenames_to_rename = migrations_dir
-        .filter_map(|entry| match entry {
-            Ok(file) => {
-                let file_name = file.file_name();
-                if regex.is_match(file_name.to_str().unwrap_or("")) {
-                    Some(file_name)
-                } else {
-                    None
-                }
-            }
-            Err(_) => None,
-        })
-        .collect::<Vec<_>>();
-
-    for filename in migration_filenames_to_rename {
-        let filename = filename
-            .to_str()
-            .context("Cannot convert filename to string")?;
-
-        let captures = regex
-            .captures(filename)
-            .context("Cannot retrieve from pattern")?;
-        let seconds = captures
-            .get(1)
-            .context("Cannot retrieve from pattern")?
-            .as_str();
-
-        let new_filename_prefix = format!("{}{}_", now.format("%Y%m%d_%H%M"), seconds);
-        let new_filename = regex.replace(filename, new_filename_prefix);
-
-        let from = format!("{}/{}", migrations_dir_path.display(), filename);
-        let to = format!("{}/{}", migrations_dir_path.display(), new_filename);
-
-        fs::rename(from, to)?;
+    {
+        println!("Cloning template...");
+        extract(from, to)?;
     }
 
-    // Rename files in migrations/down folder
-    let regex = regex::Regex::new(r"^YYYYMMDD_HHMM(\d{2})_")?;
+    {
+        let cargo_toml_jinja2_path = to.join("Cargo.toml.jinja2");
+        let cargo_toml_jinja2_content = fs::read_to_string(&cargo_toml_jinja2_path)?;
 
-    let down_migrations_dir_path = migrations_dir_path.join("down");
-    let down_migrations_dir = fs::read_dir(&down_migrations_dir_path)?;
+        let mut env = Environment::new();
+        env.add_template("Cargo.toml", &cargo_toml_jinja2_content)?;
+        let cargo_toml_template = env.get_template("Cargo.toml")?;
 
-    let down_migration_filenames_to_rename = down_migrations_dir
-        .filter_map(|entry| match entry {
-            Ok(file) => {
-                let file_name = file.file_name();
-                if regex.is_match(file_name.to_str().unwrap_or("")) {
-                    Some(file_name)
-                } else {
-                    None
+        let cargo_toml_content = cargo_toml_template.render(context! { name })?;
+        let cargo_toml_path = to.join("Cargo.toml");
+
+        // Create file
+        let mut fsf = fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&cargo_toml_path)?;
+        fsf.write_all(cargo_toml_content.as_bytes())?;
+        fsf.sync_all()?;
+
+        // Remove jinja2 file
+        fs::remove_file(cargo_toml_jinja2_path)?;
+    }
+
+    {
+        let index_html_jinja2_path = to.join("index.html.jinja2");
+        let index_html_jinja2_content = fs::read_to_string(&index_html_jinja2_path)?;
+
+        let mut env = Environment::new();
+        env.add_template("index.html", &index_html_jinja2_content)?;
+        let index_html_template = env.get_template("index.html")?;
+
+        let index_html_content = index_html_template.render(context! { name })?;
+        let index_html_path = to.join("index.html");
+
+        // Create file
+        let mut fsf = fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&index_html_path)?;
+        fsf.write_all(index_html_content.as_bytes())?;
+        fsf.sync_all()?;
+
+        // Remove jinja2 file
+        fs::remove_file(index_html_jinja2_path)?;
+    }
+
+    {
+        println!("Creating migration project...");
+
+        // Rename files in migrations folder
+        let regex = regex::Regex::new(r"^YYYYMMDD_HHMM(\d{2})_")?;
+
+        let migrations_dir_path = to.join("migrations");
+        let migrations_dir = fs::read_dir(&migrations_dir_path)?;
+
+        let migration_filenames_to_rename = migrations_dir
+            .filter_map(|entry| match entry {
+                Ok(file) => {
+                    let file_name = file.file_name();
+                    if regex.is_match(file_name.to_str().unwrap_or("")) {
+                        Some(file_name)
+                    } else {
+                        None
+                    }
                 }
-            }
-            Err(_) => None,
-        })
-        .collect::<Vec<_>>();
+                Err(_) => None,
+            })
+            .collect::<Vec<_>>();
 
-    for filename in down_migration_filenames_to_rename {
-        let filename = filename
-            .to_str()
-            .context("Cannot convert filename to string")?;
+        for filename in migration_filenames_to_rename {
+            let filename = filename
+                .to_str()
+                .context("Cannot convert filename to string")?;
 
-        let captures = regex
-            .captures(filename)
-            .context("Cannot retrieve from pattern")?;
-        let seconds = captures
-            .get(1)
-            .context("Cannot retrieve from pattern")?
-            .as_str();
+            let captures = regex
+                .captures(filename)
+                .context("Cannot retrieve from pattern")?;
+            let seconds = captures
+                .get(1)
+                .context("Cannot retrieve from pattern")?
+                .as_str();
 
-        let new_filename_prefix = format!("{}{}_", now.format("%Y%m%d_%H%M"), seconds);
-        let new_filename = regex.replace(filename, new_filename_prefix);
+            let new_filename_prefix = format!("{}{}_", now.format("%Y%m%d_%H%M"), seconds);
+            let new_filename = regex.replace(filename, new_filename_prefix);
 
-        let from = format!("{}/{}", down_migrations_dir_path.display(), filename);
-        let to = format!("{}/{}", down_migrations_dir_path.display(), new_filename);
+            let from = format!("{}/{}", migrations_dir_path.display(), filename);
+            let to = format!("{}/{}", migrations_dir_path.display(), new_filename);
 
-        fs::rename(from, to)?;
+            fs::rename(from, to)?;
+        }
+
+        // Rename files in migrations/down folder
+        let regex = regex::Regex::new(r"^YYYYMMDD_HHMM(\d{2})_")?;
+
+        let down_migrations_dir_path = migrations_dir_path.join("down");
+        let down_migrations_dir = fs::read_dir(&down_migrations_dir_path)?;
+
+        let down_migration_filenames_to_rename = down_migrations_dir
+            .filter_map(|entry| match entry {
+                Ok(file) => {
+                    let file_name = file.file_name();
+                    if regex.is_match(file_name.to_str().unwrap_or("")) {
+                        Some(file_name)
+                    } else {
+                        None
+                    }
+                }
+                Err(_) => None,
+            })
+            .collect::<Vec<_>>();
+
+        for filename in down_migration_filenames_to_rename {
+            let filename = filename
+                .to_str()
+                .context("Cannot convert filename to string")?;
+
+            let captures = regex
+                .captures(filename)
+                .context("Cannot retrieve from pattern")?;
+            let seconds = captures
+                .get(1)
+                .context("Cannot retrieve from pattern")?
+                .as_str();
+
+            let new_filename_prefix = format!("{}{}_", now.format("%Y%m%d_%H%M"), seconds);
+            let new_filename = regex.replace(filename, new_filename_prefix);
+
+            let from = format!("{}/{}", down_migrations_dir_path.display(), filename);
+            let to = format!("{}/{}", down_migrations_dir_path.display(), new_filename);
+
+            fs::rename(from, to)?;
+        }
     }
 
     Ok(())
