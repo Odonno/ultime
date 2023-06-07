@@ -96,6 +96,56 @@ fn create_project_dir(from: &Dir, to: &Path, name: &str) -> Result<()> {
         fs::remove_file(index_html_jinja2_path)?;
     }
 
+    let src_folder = to.join("src");
+
+    {
+        let app_rs_jinja2_path = src_folder.join("app.rs.jinja2");
+        let app_rs_jinja2_content = fs::read_to_string(&app_rs_jinja2_path)?;
+
+        let mut env = Environment::new();
+        env.add_template("app.rs", &app_rs_jinja2_content)?;
+        let app_rs_template = env.get_template("app.rs")?;
+
+        let app_rs_content = app_rs_template.render(context! { name })?;
+        let app_rs_path = src_folder.join("app.rs");
+
+        // Create file
+        let mut fsf = fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&app_rs_path)?;
+        fsf.write_all(app_rs_content.as_bytes())?;
+        fsf.sync_all()?;
+
+        // Remove jinja2 file
+        fs::remove_file(app_rs_jinja2_path)?;
+    }
+
+    {
+        let name = name.replace('-', "_");
+
+        let main_rs_jinja2_path = src_folder.join("main.rs.jinja2");
+        let main_rs_jinja2_content = fs::read_to_string(&main_rs_jinja2_path)?;
+
+        let mut env = Environment::new();
+        env.add_template("main.rs", &main_rs_jinja2_content)?;
+        let main_rs_template = env.get_template("main.rs")?;
+
+        let main_rs_content = main_rs_template.render(context! { name })?;
+        let main_rs_path = src_folder.join("main.rs");
+
+        // Create file
+        let mut fsf = fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&main_rs_path)?;
+        fsf.write_all(main_rs_content.as_bytes())?;
+        fsf.sync_all()?;
+
+        // Remove jinja2 file
+        fs::remove_file(main_rs_jinja2_path)?;
+    }
+
     {
         println!("Creating migration project...");
 
