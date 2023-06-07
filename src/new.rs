@@ -22,8 +22,7 @@ pub fn main(name: String) -> Result<()> {
         .get_dir(template_dir_name)
         .context("Cannot get template dir")?;
 
-    let to = name.to_string();
-    let to = Path::new(&to);
+    let to = Path::new(&name);
 
     if to.exists() {
         return Err(anyhow!("Project already exists"));
