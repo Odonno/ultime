@@ -1,0 +1,63 @@
+name: Main Workflow
+
+on: push
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Install stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Run check
+        run: cargo check --all
+
+      - name: Run tests
+        run: cargo test
+
+      - name: Run format
+        run: |
+          cargo check --all
+          cargo fix
+
+      - name: Run lint
+        run: cargo clippy -- -Dwarnings
+
+  coverage:
+    needs: ci
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Install stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Run cargo-tarpaulin
+        uses: actions-rs/tarpaulin@v0.1
+        with:
+          version: "0.22.0"
+          args: "--engine llvm --target-dir target/tarpaulin --skip-clean"
+
+      - name: Upload to codecov.io
+        uses: codecov/codecov-action@v3
+
+      - name: Archive code coverage results
+        uses: actions/upload-artifact@v1
+        with:
+          name: code-coverage-report
+          path: cobertura.xml
