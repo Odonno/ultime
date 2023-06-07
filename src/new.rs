@@ -1,4 +1,5 @@
 use anyhow::{anyhow, Context, Result};
+use chrono::Local;
 use include_dir::{include_dir, Dir};
 use minijinja::{context, Environment};
 use std::{
@@ -43,6 +44,8 @@ pub fn main(name: String) -> Result<()> {
 }
 
 fn create_project_dir(from: &Dir, to: &Path, name: &str) -> Result<()> {
+    let now = Local::now();
+
     extract(from, to)?;
 
     let cargo_toml_jinja2_path = to.join("Cargo.toml.jinja2");
@@ -65,6 +68,90 @@ fn create_project_dir(from: &Dir, to: &Path, name: &str) -> Result<()> {
 
     // Remove jinja2 file
     fs::remove_file(cargo_toml_jinja2_path)?;
+
+    // Rename files in migrations folder
+    let regex = regex::Regex::new(r"^YYYYMMDD_HHMM(\d{2})_")?;
+
+    let migrations_dir_path = to.join("migrations");
+    let migrations_dir = fs::read_dir(&migrations_dir_path)?;
+
+    let migration_filenames_to_rename = migrations_dir
+        .filter_map(|entry| match entry {
+            Ok(file) => {
+                let file_name = file.file_name();
+                if regex.is_match(file_name.to_str().unwrap_or("")) {
+                    Some(file_name)
+                } else {
+                    None
+                }
+            }
+            Err(_) => None,
+        })
+        .collect::<Vec<_>>();
+
+    for filename in migration_filenames_to_rename {
+        let filename = filename
+            .to_str()
+            .context("Cannot convert filename to string")?;
+
+        let captures = regex
+            .captures(filename)
+            .context("Cannot retrieve from pattern")?;
+        let seconds = captures
+            .get(1)
+            .context("Cannot retrieve from pattern")?
+            .as_str();
+
+        let new_filename_prefix = format!("{}{}_", now.format("%Y%m%d_%H%M"), seconds);
+        let new_filename = regex.replace(filename, new_filename_prefix);
+
+        let from = format!("{}/{}", migrations_dir_path.display(), filename);
+        let to = format!("{}/{}", migrations_dir_path.display(), new_filename);
+
+        fs::rename(from, to)?;
+    }
+
+    // Rename files in migrations/down folder
+    let regex = regex::Regex::new(r"^YYYYMMDD_HHMM(\d{2})_")?;
+
+    let down_migrations_dir_path = migrations_dir_path.join("down");
+    let down_migrations_dir = fs::read_dir(&down_migrations_dir_path)?;
+
+    let down_migration_filenames_to_rename = down_migrations_dir
+        .filter_map(|entry| match entry {
+            Ok(file) => {
+                let file_name = file.file_name();
+                if regex.is_match(file_name.to_str().unwrap_or("")) {
+                    Some(file_name)
+                } else {
+                    None
+                }
+            }
+            Err(_) => None,
+        })
+        .collect::<Vec<_>>();
+
+    for filename in down_migration_filenames_to_rename {
+        let filename = filename
+            .to_str()
+            .context("Cannot convert filename to string")?;
+
+        let captures = regex
+            .captures(filename)
+            .context("Cannot retrieve from pattern")?;
+        let seconds = captures
+            .get(1)
+            .context("Cannot retrieve from pattern")?
+            .as_str();
+
+        let new_filename_prefix = format!("{}{}_", now.format("%Y%m%d_%H%M"), seconds);
+        let new_filename = regex.replace(filename, new_filename_prefix);
+
+        let from = format!("{}/{}", down_migrations_dir_path.display(), filename);
+        let to = format!("{}/{}", down_migrations_dir_path.display(), new_filename);
+
+        fs::rename(from, to)?;
+    }
 
     Ok(())
 }
