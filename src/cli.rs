@@ -5,7 +5,7 @@ use clap::{Parser, Subcommand};
 /// The ultimate full-stack experience
 pub struct Args {
     #[command(subcommand)]
-    pub command: Action,
+    pub command: Option<Action>,
 }
 
 #[derive(Subcommand, Debug)]

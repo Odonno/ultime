@@ -6,11 +6,15 @@ use crate::cli::Args;
 
 mod cli;
 mod new;
+mod run;
 
 fn main() -> Result<()> {
     let args = Args::parse();
 
     match args.command {
-        Action::New { name } => new::main(name),
+        None => run::main(),
+        Some(command) => match command {
+            Action::New { name } => new::main(name),
+        },
     }
 }
