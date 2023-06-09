@@ -13,7 +13,7 @@ pub enum UltimeProjectTemplate {
 }
 
 pub fn main(name: String) -> Result<()> {
-    const TEMPLATES_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/templates");
+    const TEMPLATES_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/templates/projects");
 
     let template = UltimeProjectTemplate::Blog;
 

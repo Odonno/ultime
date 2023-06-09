@@ -1,5 +1,8 @@
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use convert_case::{Case, Casing};
+use include_dir::{include_dir, Dir};
+use minijinja::{context, Environment};
+use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
@@ -13,6 +16,12 @@ use surrealdb::sql::{
 enum SurrealType {
     Id,
     Unknown,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct StructField {
+    name: String,
+    type_str: String,
 }
 
 pub fn main() -> Result<()> {
@@ -84,7 +93,7 @@ pub fn main() -> Result<()> {
                 struct_fields.insert(field_name, field_type);
             }
 
-            let struct_fields_str = struct_fields
+            let struct_fields = struct_fields
                 .iter()
                 .map(|(field_name, field_type)| {
                     let type_str = match field_type {
@@ -92,27 +101,27 @@ pub fn main() -> Result<()> {
                         SurrealType::Unknown => "String",
                     };
 
-                    format!("{}: {},", field_name, type_str)
+                    StructField {
+                        name: field_name.to_string(),
+                        type_str: type_str.to_string(),
+                    }
                 })
-                .collect::<Vec<_>>()
-                .join(",\n");
+                .collect::<Vec<_>>();
 
-            // TODO : jinja2 template
-            let template = format!(
-                "use serde::{{Deserialize, Serialize}};
-use surrealdb::{{sql::Thing, Connection, Surreal}};
+            const TEMPLATES_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/templates/generate");
 
-#[derive(Serialize, Deserialize, Debug)]
-struct {1} {{
-    {2}
-}}
-        
-pub async fn get_all_{0}<C: Connection>(db: &'_ Surreal<C>) -> Result<Vec<{1}>> {{
-    let result = db.select(\"{0}\").await?;
-    Ok(result)
-}}",
-                &table_name, struct_name, struct_fields_str
-            );
+            let template_content = TEMPLATES_DIR
+                .get_file("crud.rs.jinja2")
+                .context("Cannot get template 'crud.rs.jinja2'")?
+                .contents_utf8()
+                .context("Cannot get template 'crud.rs.jinja2'")?
+                .to_string();
+
+            let mut env = Environment::new();
+            env.add_template("crud.rs", &template_content)?;
+            let template = env.get_template("crud.rs")?;
+
+            let content = template.render(context! { table_name, struct_name, struct_fields })?;
 
             // TODO : get by id
             // TODO : create
@@ -120,7 +129,7 @@ pub async fn get_all_{0}<C: Connection>(db: &'_ Surreal<C>) -> Result<Vec<{1}>> 
             // TODO : delete
             // TODO : only get functions for "script_migration"
 
-            schemas_to_generate.insert(table_name, template);
+            schemas_to_generate.insert(table_name, content);
         }
     }
 

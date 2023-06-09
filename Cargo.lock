@@ -2243,6 +2243,7 @@ dependencies = [
  "include_dir",
  "minijinja",
  "regex",
+ "serde",
  "surrealdb",
 ]
 

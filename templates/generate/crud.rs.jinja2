@@ -1,0 +1,14 @@
+use serde::{Deserialize, Serialize};
+use surrealdb::{sql::Thing, Connection, Surreal};
+
+#[derive(Serialize, Deserialize, Debug)]
+struct {{ struct_name }} {
+{% for field in struct_fields %}
+    {{ field.name }}: {{ field.type_str }},
+{% endfor %}
+}
+        
+pub async fn get_all_{{ table_name }}<C: Connection>(db: &'_ Surreal<C>) -> Result<Vec<{{ struct_name }}>> {
+    let result = db.select("{{ table_name }}").await?;
+    Ok(result)
+}
