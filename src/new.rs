@@ -54,11 +54,8 @@ fn create_project_dir(from: &Dir, to: &Path, name: &str) -> Result<()> {
         let cargo_toml_jinja2_path = to.join("Cargo.toml.jinja2");
         let cargo_toml_jinja2_content = fs::read_to_string(&cargo_toml_jinja2_path)?;
 
-        let mut env = Environment::new();
-        env.add_template("Cargo.toml", &cargo_toml_jinja2_content)?;
-        let cargo_toml_template = env.get_template("Cargo.toml")?;
-
-        let cargo_toml_content = cargo_toml_template.render(context! { name })?;
+        let cargo_toml_content =
+            Environment::new().render_str(&cargo_toml_jinja2_content, context! { name })?;
         let cargo_toml_path = to.join("Cargo.toml");
 
         // Create file
@@ -77,11 +74,8 @@ fn create_project_dir(from: &Dir, to: &Path, name: &str) -> Result<()> {
         let index_html_jinja2_path = to.join("index.html.jinja2");
         let index_html_jinja2_content = fs::read_to_string(&index_html_jinja2_path)?;
 
-        let mut env = Environment::new();
-        env.add_template("index.html", &index_html_jinja2_content)?;
-        let index_html_template = env.get_template("index.html")?;
-
-        let index_html_content = index_html_template.render(context! { name })?;
+        let index_html_content =
+            Environment::new().render_str(&index_html_jinja2_content, context! { name })?;
         let index_html_path = to.join("index.html");
 
         // Create file
@@ -102,11 +96,8 @@ fn create_project_dir(from: &Dir, to: &Path, name: &str) -> Result<()> {
         let app_rs_jinja2_path = src_folder.join("app.rs.jinja2");
         let app_rs_jinja2_content = fs::read_to_string(&app_rs_jinja2_path)?;
 
-        let mut env = Environment::new();
-        env.add_template("app.rs", &app_rs_jinja2_content)?;
-        let app_rs_template = env.get_template("app.rs")?;
-
-        let app_rs_content = app_rs_template.render(context! { name })?;
+        let app_rs_content =
+            Environment::new().render_str(&app_rs_jinja2_content, context! { name })?;
         let app_rs_path = src_folder.join("app.rs");
 
         // Create file
@@ -127,11 +118,8 @@ fn create_project_dir(from: &Dir, to: &Path, name: &str) -> Result<()> {
         let main_rs_jinja2_path = src_folder.join("main.rs.jinja2");
         let main_rs_jinja2_content = fs::read_to_string(&main_rs_jinja2_path)?;
 
-        let mut env = Environment::new();
-        env.add_template("main.rs", &main_rs_jinja2_content)?;
-        let main_rs_template = env.get_template("main.rs")?;
-
-        let main_rs_content = main_rs_template.render(context! { name })?;
+        let main_rs_content =
+            Environment::new().render_str(&main_rs_jinja2_content, context! { name })?;
         let main_rs_path = src_folder.join("main.rs");
 
         // Create file

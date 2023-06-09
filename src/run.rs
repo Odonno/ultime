@@ -117,11 +117,10 @@ pub fn main() -> Result<()> {
                 .context("Cannot get template 'crud.rs.jinja2'")?
                 .to_string();
 
-            let mut env = Environment::new();
-            env.add_template("crud.rs", &template_content)?;
-            let template = env.get_template("crud.rs")?;
-
-            let content = template.render(context! { table_name, struct_name, struct_fields })?;
+            let content = Environment::new().render_str(
+                &template_content,
+                context! { table_name, struct_name, struct_fields },
+            )?;
 
             // TODO : get by id
             // TODO : create
