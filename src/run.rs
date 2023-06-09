@@ -108,19 +108,8 @@ pub fn main() -> Result<()> {
                 })
                 .collect::<Vec<_>>();
 
-            const TEMPLATES_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/templates/generate");
-
-            let template_content = TEMPLATES_DIR
-                .get_file("crud.rs.jinja2")
-                .context("Cannot get template 'crud.rs.jinja2'")?
-                .contents_utf8()
-                .context("Cannot get template 'crud.rs.jinja2'")?
-                .to_string();
-
-            let content = Environment::new().render_str(
-                &template_content,
-                context! { table_name, struct_name, struct_fields },
-            )?;
+            let content =
+                generate_from_crud_template(table_name.to_string(), struct_name, struct_fields)?;
 
             // TODO : get by id
             // TODO : create
@@ -272,4 +261,77 @@ fn ensures_folder_exists(dir_path: &PathBuf) -> Result<()> {
     }
 
     Ok(())
+}
+
+fn generate_from_crud_template(
+    table_name: String,
+    struct_name: String,
+    struct_fields: Vec<StructField>,
+) -> Result<String> {
+    const TEMPLATES_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/templates/generate");
+
+    let template_content = TEMPLATES_DIR
+        .get_file("crud.rs.jinja2")
+        .context("Cannot get template 'crud.rs.jinja2'")?
+        .contents_utf8()
+        .context("Cannot get template 'crud.rs.jinja2'")?
+        .to_string();
+
+    let content = Environment::new().render_str(
+        &template_content,
+        context! { table_name, struct_name, struct_fields },
+    )?;
+
+    Ok(content)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use pretty_assertions::assert_eq;
+
+    #[test]
+    fn generate_post_crud_content() {
+        let table_name = "post";
+        let struct_name = "Post";
+        let struct_fields = vec![
+            StructField {
+                name: "id".to_string(),
+                type_str: "Thing".to_string(),
+            },
+            StructField {
+                name: "title".to_string(),
+                type_str: "String".to_string(),
+            },
+            StructField {
+                name: "content".to_string(),
+                type_str: "String".to_string(),
+            },
+        ];
+
+        let result = generate_from_crud_template(
+            table_name.to_string(),
+            struct_name.to_string(),
+            struct_fields,
+        )
+        .unwrap();
+
+        assert_eq!(
+            result,
+            "use serde::{Deserialize, Serialize};
+use surrealdb::{sql::Thing, Connection, Surreal};
+
+#[derive(Serialize, Deserialize, Debug)]
+struct Post {
+    id: Thing,
+    title: String,
+    content: String,
+}
+
+pub async fn get_all_post<C: Connection>(db: &'_ Surreal<C>) -> Result<Vec<Post>> {
+    let result = db.select(\"post\").await?;
+    Ok(result)
+}"
+        );
+    }
 }
