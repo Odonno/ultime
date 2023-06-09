@@ -9,7 +9,9 @@ use std::{
     process::{Command, Stdio},
 };
 use surrealdb::sql::{
-    statements::{DefineFieldStatement, DefineStatement, DefineTableStatement},
+    statements::{
+        DefineEventStatement, DefineFieldStatement, DefineStatement, DefineTableStatement,
+    },
     Statement,
 };
 
@@ -31,10 +33,10 @@ pub fn main() -> Result<()> {
 
     start_surrealdb_instance()?;
 
-    let queries_dir = Path::new("queries");
-    if queries_dir.exists() {
-        // TODO : Generate queries
-    }
+    let src_dir = Path::new("src");
+
+    // TODO : Generate queries
+    let _queries_dir = Path::new("queries");
 
     // Generate crud queries
     let mut schemas_to_generate: HashMap<String, String> = HashMap::new();
@@ -45,28 +47,18 @@ pub fn main() -> Result<()> {
     for schema_file in schemas_files {
         let schema_file = schema_file?;
         let schema_file_path = schema_file.path();
-        let schema_file_name = schema_file_path.file_name().unwrap().to_str().unwrap();
-        let schema_file_name_without_extension = schema_file_name.split('.').next().unwrap();
         let schema_file_content = std::fs::read_to_string(&schema_file_path)?;
-
-        println!("schema_file_name: {}", schema_file_name);
-        println!(
-            "schema_file_name_without_extension: {}",
-            schema_file_name_without_extension
-        );
-        println!("schema_file_content: {}", schema_file_content);
 
         let parsed_schema = surrealdb::sql::parse(&schema_file_content)?;
         let schema_statements = parsed_schema.0 .0;
 
         let define_table_statements = extract_define_table_statements(schema_statements.clone());
+        let define_field_statements = extract_define_field_statements(schema_statements);
 
         let tables = define_table_statements
             .into_iter()
             .map(|define_table_statement| define_table_statement.name.to_string())
             .collect::<Vec<_>>();
-
-        let define_field_statements = extract_define_field_statements(schema_statements);
 
         for table in tables {
             let table_name = table;
@@ -113,15 +105,14 @@ pub fn main() -> Result<()> {
 
             // TODO : get by id
             // TODO : create
-            // TODO : update
-            // TODO : delete
+            // TODO : update by id
+            // TODO : delete all
+            // TODO : delete by id
             // TODO : only get functions for "script_migration"
 
             schemas_to_generate.insert(table_name, content);
         }
     }
-
-    let src_dir = Path::new("src");
 
     let has_schemas_to_generate = !schemas_to_generate.is_empty();
     if has_schemas_to_generate {
@@ -149,22 +140,142 @@ pub fn main() -> Result<()> {
         std::fs::write(crud_mod_file_path, crud_mod_file_content)?;
     }
 
+    // Generate mutations
+    let mut events_to_generate: HashMap<String, String> = HashMap::new();
+
     let events_dir = Path::new("events");
-    if events_dir.exists() {
-        // TODO : Generate mutations
+    let events_files = events_dir.read_dir()?;
+
+    for event_files in events_files {
+        let event_files = event_files?;
+        let event_files_path = event_files.path();
+        let event_files_content = std::fs::read_to_string(&event_files_path)?;
+
+        let parsed_event = surrealdb::sql::parse(&event_files_content)?;
+        let event_statements = parsed_event.0 .0;
+
+        let define_table_statements = extract_define_table_statements(event_statements.clone());
+        let define_field_statements = extract_define_field_statements(event_statements.clone());
+        let define_event_statements = extract_define_event_statements(event_statements);
+
+        let events = define_event_statements
+            .into_iter()
+            .map(|define_event_statement| define_event_statement.name.to_string())
+            .collect::<Vec<_>>();
+
+        for event in events {
+            let table_name = event;
+
+            let table_definition_statement =
+                define_table_statements
+                    .clone()
+                    .into_iter()
+                    .find(|define_table_statement| {
+                        define_table_statement.name.to_string() == table_name
+                    });
+
+            if table_definition_statement.is_none() {
+                continue;
+            }
+
+            let struct_name = format!("{}{}", table_name, "Data").to_case(Case::Pascal);
+            let func_name = table_name.to_case(Case::Snake);
+
+            let mut struct_fields: HashMap<String, SurrealType> = HashMap::new();
+            struct_fields.insert("id".to_string(), SurrealType::Id);
+
+            let define_field_statements = define_field_statements
+                .clone()
+                .into_iter()
+                .filter(|define_field_statement| {
+                    define_field_statement.what.to_string() == table_name
+                })
+                .collect::<Vec<_>>();
+
+            for define_field_statement in define_field_statements {
+                let field_name = define_field_statement.name.to_string();
+                // TODO : Handle other field types
+                let field_type = match define_field_statement.kind {
+                    _ => SurrealType::Unknown,
+                };
+
+                struct_fields.insert(field_name, field_type);
+            }
+
+            let struct_fields = struct_fields
+                .iter()
+                .map(|(field_name, field_type)| {
+                    let type_str = match field_type {
+                        SurrealType::Id => "Thing",
+                        SurrealType::Unknown => "String",
+                    };
+
+                    StructField {
+                        name: field_name.to_string(),
+                        type_str: type_str.to_string(),
+                    }
+                })
+                .collect::<Vec<_>>();
+
+            let content = generate_from_mutation_template(
+                func_name,
+                table_name.to_string(),
+                struct_name,
+                struct_fields,
+            )?;
+
+            events_to_generate.insert(table_name, content);
+        }
     }
 
-    let has_db_changes = has_schemas_to_generate;
+    let has_events_to_generate = !events_to_generate.is_empty();
+    if has_events_to_generate {
+        let db_dir = src_dir.join("db");
+        ensures_folder_exists(&db_dir)?;
+
+        let events_dir = db_dir.join("events");
+        ensures_folder_exists(&events_dir)?;
+
+        for (table_name, template) in &events_to_generate {
+            let generated_events_file_name = format!("{}.rs", table_name);
+            let generated_events_file_path = events_dir.join(generated_events_file_name);
+
+            std::fs::write(generated_events_file_path, template)?;
+        }
+
+        let events_mod_file_path = events_dir.join("events.rs");
+
+        let events_mod_file_content = events_to_generate
+            .keys()
+            .map(|table_name| format!("pub mod {};", table_name))
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        std::fs::write(events_mod_file_path, events_mod_file_content)?;
+    }
+
+    // Generate db.rs
+    let has_db_changes = has_schemas_to_generate || has_events_to_generate;
     if has_db_changes {
         let mod_file_path = src_dir.join("db.rs");
+        let mut mod_file_modules = vec![];
 
-        let mod_file_content = if has_schemas_to_generate {
-            "pub mod crud;"
-        } else {
-            ""
-        };
+        if has_schemas_to_generate {
+            mod_file_modules.push("crud");
+        }
+        if has_events_to_generate {
+            mod_file_modules.push("events");
+        }
+
+        let mod_file_content = mod_file_modules
+            .iter()
+            .map(|module| format!("pub mod {};", module))
+            .collect::<Vec<_>>()
+            .join("\n");
 
         std::fs::write(mod_file_path, mod_file_content)?;
+    } else {
+        // TODO : Remove db.rs if it exists
     }
 
     start_leptos_app()?;
@@ -255,6 +366,20 @@ fn extract_define_field_statements(statements: Vec<Statement>) -> Vec<DefineFiel
         .collect::<Vec<_>>()
 }
 
+fn extract_define_event_statements(statements: Vec<Statement>) -> Vec<DefineEventStatement> {
+    statements
+        .into_iter()
+        .filter_map(|statement| match statement {
+            Statement::Define(define_statement) => Some(define_statement),
+            _ => None,
+        })
+        .filter_map(|define_statement| match define_statement {
+            DefineStatement::Event(define_event_statement) => Some(define_event_statement),
+            _ => None,
+        })
+        .collect::<Vec<_>>()
+}
+
 fn ensures_folder_exists(dir_path: &PathBuf) -> Result<()> {
     if !dir_path.exists() {
         fs_extra::dir::create_all(dir_path, false)?;
@@ -280,6 +405,29 @@ fn generate_from_crud_template(
     let content = Environment::new().render_str(
         &template_content,
         context! { table_name, struct_name, struct_fields },
+    )?;
+
+    Ok(content)
+}
+
+fn generate_from_mutation_template(
+    func_name: String,
+    table_name: String,
+    struct_name: String,
+    struct_fields: Vec<StructField>,
+) -> Result<String> {
+    const TEMPLATES_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/templates/generate");
+
+    let template_content = TEMPLATES_DIR
+        .get_file("mutation.rs.jinja2")
+        .context("Cannot get template 'mutation.rs.jinja2'")?
+        .contents_utf8()
+        .context("Cannot get template 'mutation.rs.jinja2'")?
+        .to_string();
+
+    let content = Environment::new().render_str(
+        &template_content,
+        context! { func_name, table_name, struct_name, struct_fields },
     )?;
 
     Ok(content)
@@ -331,6 +479,53 @@ struct Post {
 pub async fn get_all_post<C: Connection>(db: &'_ Surreal<C>) -> Result<Vec<Post>> {
     let result = db.select(\"post\").await?;
     Ok(result)
+}"
+        );
+    }
+
+    #[test]
+    fn generate_publish_post_mutation_content() {
+        let func_name = "publish_post";
+        let table_name = "publish_post";
+        let struct_name = "PublishPostData";
+        let struct_fields = vec![
+            StructField {
+                name: "id".to_string(),
+                type_str: "Thing".to_string(),
+            },
+            StructField {
+                name: "title".to_string(),
+                type_str: "String".to_string(),
+            },
+            StructField {
+                name: "content".to_string(),
+                type_str: "String".to_string(),
+            },
+        ];
+
+        let result = generate_from_mutation_template(
+            func_name.to_string(),
+            table_name.to_string(),
+            struct_name.to_string(),
+            struct_fields,
+        )
+        .unwrap();
+
+        assert_eq!(
+            result,
+            "use serde::{Deserialize, Serialize};
+use surrealdb::{sql::Thing, Connection, Surreal};
+
+#[derive(Serialize, Deserialize, Debug)]
+struct PublishPostData {
+    id: Thing,
+    title: String,
+    content: String,
+}
+
+pub async fn publish_post<C: Connection>(db: &'_ Surreal<C>, data: PublishPostData) -> Result<PublishPostData> {
+    let record: PublishPostData = db.create(\"publish_post\").content(data).await?;
+    Ok(record)
 }"
         );
     }
