@@ -17,11 +17,12 @@ use surrealdb::sql::{
     statements::{
         DefineEventStatement, DefineFieldStatement, DefineStatement, DefineTableStatement,
     },
-    Statement,
+    Kind, Statement,
 };
 
 enum SurrealType {
     Id,
+    String,
     Unknown,
 }
 
@@ -134,9 +135,6 @@ fn generate_db_folder() -> Result<()> {
                 let table_name = table;
                 let struct_name = table_name.to_case(Case::Pascal);
 
-                let mut struct_fields: HashMap<String, SurrealType> = HashMap::new();
-                struct_fields.insert("id".to_string(), SurrealType::Id);
-
                 let define_field_statements = define_field_statements
                     .clone()
                     .into_iter()
@@ -145,30 +143,7 @@ fn generate_db_folder() -> Result<()> {
                     })
                     .collect::<Vec<_>>();
 
-                for define_field_statement in define_field_statements {
-                    let field_name = define_field_statement.name.to_string();
-                    // TODO : Handle other field types
-                    let field_type = match define_field_statement.kind {
-                        _ => SurrealType::Unknown,
-                    };
-
-                    struct_fields.insert(field_name, field_type);
-                }
-
-                let struct_fields = struct_fields
-                    .iter()
-                    .map(|(field_name, field_type)| {
-                        let type_str = match field_type {
-                            SurrealType::Id => "Thing",
-                            SurrealType::Unknown => "String",
-                        };
-
-                        StructField {
-                            name: field_name.to_string(),
-                            type_str: type_str.to_string(),
-                        }
-                    })
-                    .collect::<Vec<_>>();
+                let struct_fields = extract_struct_fields(define_field_statements);
 
                 let content = generate_from_crud_template(
                     table_name.to_string(),
@@ -250,9 +225,6 @@ fn generate_db_folder() -> Result<()> {
                 let struct_name = format!("{}{}", table_name, "Data").to_case(Case::Pascal);
                 let func_name = table_name.to_case(Case::Snake);
 
-                let mut struct_fields: HashMap<String, SurrealType> = HashMap::new();
-                struct_fields.insert("id".to_string(), SurrealType::Id);
-
                 let define_field_statements = define_field_statements
                     .clone()
                     .into_iter()
@@ -261,30 +233,7 @@ fn generate_db_folder() -> Result<()> {
                     })
                     .collect::<Vec<_>>();
 
-                for define_field_statement in define_field_statements {
-                    let field_name = define_field_statement.name.to_string();
-                    // TODO : Handle other field types
-                    let field_type = match define_field_statement.kind {
-                        _ => SurrealType::Unknown,
-                    };
-
-                    struct_fields.insert(field_name, field_type);
-                }
-
-                let struct_fields = struct_fields
-                    .iter()
-                    .map(|(field_name, field_type)| {
-                        let type_str = match field_type {
-                            SurrealType::Id => "Thing",
-                            SurrealType::Unknown => "String",
-                        };
-
-                        StructField {
-                            name: field_name.to_string(),
-                            type_str: type_str.to_string(),
-                        }
-                    })
-                    .collect::<Vec<_>>();
+                let struct_fields = extract_struct_fields(define_field_statements);
 
                 let content = generate_from_mutation_template(
                     func_name,
@@ -349,6 +298,39 @@ fn generate_db_folder() -> Result<()> {
     }
 
     Ok(())
+}
+
+fn extract_struct_fields(define_field_statements: Vec<DefineFieldStatement>) -> Vec<StructField> {
+    let mut struct_fields: HashMap<String, SurrealType> = HashMap::new();
+    struct_fields.insert("id".to_string(), SurrealType::Id);
+
+    for define_field_statement in define_field_statements {
+        let field_name = define_field_statement.name.to_string();
+        // TODO : Handle other field types
+        let field_type = match define_field_statement.kind {
+            Some(Kind::String) => SurrealType::String,
+            _ => SurrealType::Unknown,
+        };
+
+        struct_fields.insert(field_name, field_type);
+    }
+
+    let struct_fields = struct_fields
+        .iter()
+        .map(|(field_name, field_type)| {
+            let type_str = match field_type {
+                SurrealType::Id => "Thing",
+                SurrealType::String => "String",
+                SurrealType::Unknown => "String", // TODO : What to do here?
+            };
+
+            StructField {
+                name: field_name.to_string(),
+                type_str: type_str.to_string(),
+            }
+        })
+        .collect::<Vec<_>>();
+    struct_fields
 }
 
 fn watch_to_regenerate_db_folder() -> Result<()> {
