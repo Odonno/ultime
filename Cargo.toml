@@ -1,7 +1,12 @@
 [package]
 name = "ultime"
 version = "0.0.1"
+description = "The ultimate full-stack experience"
+authors = ["David Bottiau"]
+repository = "https://github.com/Odonno/ultime/"
 license = "MIT"
+keywords = ["ultime", "surrealdb", "leptos", "cli"]
+categories = ["command-line-utilities"]
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
