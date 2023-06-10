@@ -1,12 +1,42 @@
 use serde::{Deserialize, Serialize};
-use surrealdb::{sql::Thing, Connection, Surreal};
+use surrealdb::{sql::Thing, Connection, Result, Surreal};
 
 #[derive(Serialize, Deserialize, Debug)]
-struct {{ struct_name }} {
+pub struct {{ struct_name }} {
 {% for field in struct_fields %}    {{ field.name }}: {{ field.type_str }},
 {% endfor %}}
 
 pub async fn get_all_{{ table_name }}<C: Connection>(db: &'_ Surreal<C>) -> Result<Vec<{{ struct_name }}>> {
     let result = db.select("{{ table_name }}").await?;
+    Ok(result)
+}
+
+pub async fn get_{{ table_name }}<C: Connection>(db: &'_ Surreal<C>, id: &str) -> Result<{{ struct_name }}> {
+    let result = db.select(("{{ table_name }}", id)).await?;
+    Ok(result)
+}
+
+pub async fn find_{{ table_name }}<C: Connection>(db: &'_ Surreal<C>, id: &str) -> Result<Option<{{ struct_name }}>> {
+    let result = db.select(("{{ table_name }}", id)).await?;
+    Ok(result)
+}
+
+pub async fn create_{{ table_name }}<C: Connection>(db: &'_ Surreal<C>, data: {{ struct_name }}) -> Result<{{ struct_name }}> {
+    let result = db.create("{{ table_name }}").content(data).await?;
+    Ok(result)
+}
+
+pub async fn update_{{ table_name }}<C: Connection>(db: &'_ Surreal<C>, id: &str, data: {{ struct_name }}) -> Result<Option<{{ struct_name }}>> {
+    let result = db.update(("{{ table_name }}", id)).content(data).await?;
+    Ok(result)
+}
+
+pub async fn delete_all_{{ table_name }}<C: Connection>(db: &'_ Surreal<C>) -> Result<Vec<{{ struct_name }}>> {
+    let result = db.delete("{{ table_name }}").await?;
+    Ok(result)
+}
+
+pub async fn delete_{{ table_name }}<C: Connection>(db: &'_ Surreal<C>, id: &str) -> Result<Option<{{ struct_name }}>> {
+    let result = db.delete(("{{ table_name }}", id)).await?;
     Ok(result)
 }

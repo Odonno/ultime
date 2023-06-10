@@ -1,8 +1,8 @@
 use serde::{Deserialize, Serialize};
-use surrealdb::{sql::Thing, Connection, Surreal};
+use surrealdb::{sql::Thing, Connection, Result, Surreal};
 
 #[derive(Serialize, Deserialize, Debug)]
-struct {{ struct_name }} {
+pub struct {{ struct_name }} {
 {% for field in struct_fields %}    {{ field.name }}: {{ field.type_str }},
 {% endfor %}}
 
