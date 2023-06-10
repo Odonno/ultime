@@ -176,8 +176,6 @@ fn generate_db_folder() -> Result<()> {
                     struct_fields,
                 )?;
 
-                // TODO : only get functions for "script_migration"
-
                 schemas_to_generate.insert(table_name, content);
             }
         }
@@ -560,6 +558,61 @@ pub async fn delete_all_post<C: Connection>(db: &'_ Surreal<C>) -> Result<Vec<Po
 
 pub async fn delete_post<C: Connection>(db: &'_ Surreal<C>, id: &str) -> Result<Option<Post>> {
     let result = db.delete((\"post\", id)).await?;
+    Ok(result)
+}"
+        );
+    }
+
+    #[test]
+    fn generate_script_migration_crud_content() {
+        let table_name = "script_migration";
+        let struct_name = "ScriptMigration";
+        let struct_fields = vec![
+            StructField {
+                name: "id".to_string(),
+                type_str: "Thing".to_string(),
+            },
+            StructField {
+                name: "script_name".to_string(),
+                type_str: "String".to_string(),
+            },
+            StructField {
+                name: "executed_at".to_string(),
+                type_str: "String".to_string(),
+            },
+        ];
+
+        let result = generate_from_crud_template(
+            table_name.to_string(),
+            struct_name.to_string(),
+            struct_fields,
+        )
+        .unwrap();
+
+        assert_eq!(
+            result,
+            "use serde::{Deserialize, Serialize};
+use surrealdb::{sql::Thing, Connection, Result, Surreal};
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ScriptMigration {
+    id: Thing,
+    script_name: String,
+    executed_at: String,
+}
+
+pub async fn get_all_script_migration<C: Connection>(db: &'_ Surreal<C>) -> Result<Vec<ScriptMigration>> {
+    let result = db.select(\"script_migration\").await?;
+    Ok(result)
+}
+
+pub async fn get_script_migration<C: Connection>(db: &'_ Surreal<C>, id: &str) -> Result<ScriptMigration> {
+    let result = db.select((\"script_migration\", id)).await?;
+    Ok(result)
+}
+
+pub async fn find_script_migration<C: Connection>(db: &'_ Surreal<C>, id: &str) -> Result<Option<ScriptMigration>> {
+    let result = db.select((\"script_migration\", id)).await?;
     Ok(result)
 }"
         );

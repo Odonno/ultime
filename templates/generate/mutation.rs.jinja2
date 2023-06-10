@@ -3,8 +3,10 @@ use surrealdb::{sql::Thing, Connection, Result, Surreal};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct {{ struct_name }} {
-{% for field in struct_fields %}    {{ field.name }}: {{ field.type_str }},
-{% endfor %}}
+{%- for field in struct_fields %}
+    {{ field.name }}: {{ field.type_str }},
+{%- endfor %}
+}
 
 pub async fn {{ func_name }}<C: Connection>(db: &'_ Surreal<C>, data: {{ struct_name }}) -> Result<{{ struct_name }}> {
     let record: {{ struct_name }} = db.create("{{ table_name }}").content(data).await?;
