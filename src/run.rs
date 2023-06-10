@@ -4,7 +4,7 @@ use include_dir::{include_dir, Dir};
 use minijinja::{context, Environment};
 use notify::{
     event::{AccessKind, AccessMode},
-    EventKind, RecursiveMode, Watcher,
+    EventKind, INotifyWatcher, RecursiveMode, Watcher,
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -40,8 +40,9 @@ pub fn main() -> Result<()> {
     start_surrealdb_instance()?;
     generate_db_folder()?;
     start_leptos_app()?;
-    watch_to_regenerate_db_folder()?;
+    let _watcher = watch_to_regenerate_db_folder()?; // 💡 prevent watcher to be dropped
 
+    // 💡 infinite loop to keep the process alive
     loop {
         std::thread::sleep(Duration::from_secs(1));
     }
@@ -170,7 +171,7 @@ fn generate_db_folder() -> Result<()> {
                 std::fs::write(generated_schema_file_path, template)?;
             }
 
-            let crud_mod_file_path = crud_dir.join("crud.rs");
+            let crud_mod_file_path = db_dir.join("crud.rs");
 
             let crud_mod_file_content = schemas_to_generate
                 .keys()
@@ -261,7 +262,7 @@ fn generate_db_folder() -> Result<()> {
                 std::fs::write(generated_events_file_path, template)?;
             }
 
-            let events_mod_file_path = events_dir.join("events.rs");
+            let events_mod_file_path = db_dir.join("events.rs");
 
             let events_mod_file_content = events_to_generate
                 .keys()
@@ -293,6 +294,8 @@ fn generate_db_folder() -> Result<()> {
             .join("\n");
 
         std::fs::write(mod_file_path, mod_file_content)?;
+
+        println!("db folder generated...");
     } else {
         // TODO : Remove db.rs if it exists
     }
@@ -333,7 +336,7 @@ fn extract_struct_fields(define_field_statements: Vec<DefineFieldStatement>) -> 
     struct_fields
 }
 
-fn watch_to_regenerate_db_folder() -> Result<()> {
+fn watch_to_regenerate_db_folder() -> Result<INotifyWatcher> {
     fn watch_event(result: notify::Result<notify::Event>) {
         match result {
             Ok(event) => {
@@ -359,15 +362,17 @@ fn watch_to_regenerate_db_folder() -> Result<()> {
 
     let schemas_dir = Path::new("schemas");
     if schemas_dir.exists() {
+        println!("Watching schemas folder...");
         watcher.watch(schemas_dir, RecursiveMode::NonRecursive)?;
     }
 
     let events_dir = Path::new("events");
     if events_dir.exists() {
+        println!("Watching events folder...");
         watcher.watch(events_dir, RecursiveMode::NonRecursive)?;
     }
 
-    Ok(())
+    Ok(watcher)
 }
 
 fn extract_define_table_statements(statements: Vec<Statement>) -> Vec<DefineTableStatement> {
