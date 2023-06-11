@@ -14,7 +14,7 @@ fn main() -> Result<()> {
     match args.command {
         None => run::main(),
         Some(command) => match command {
-            Action::New { name } => new::main(name),
+            Action::New { name, template } => new::main(name, template),
         },
     }
 }

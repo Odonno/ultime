@@ -2,20 +2,22 @@ use anyhow::{anyhow, Context, Result};
 use chrono::Local;
 use include_dir::{include_dir, Dir};
 use minijinja::{context, Environment};
+use regex::Regex;
 use std::{
     fs,
     io::Write,
     path::{Path, PathBuf},
 };
 
-pub enum UltimeProjectTemplate {
-    Blog,
-}
+use crate::cli::UltimeProjectTemplate;
 
-pub fn main(name: String) -> Result<()> {
+pub fn main(name: String, template: Option<UltimeProjectTemplate>) -> Result<()> {
+    let template = match template {
+        Some(template) => template,
+        None => UltimeProjectTemplate::Empty,
+    };
+
     const TEMPLATES_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/templates/projects");
-
-    let template = UltimeProjectTemplate::Blog;
 
     let template_dir_name = get_template_name(template);
     let from = TEMPLATES_DIR
@@ -37,9 +39,17 @@ pub fn main(name: String) -> Result<()> {
         return Err(error);
     }
 
-    println!("Creating new project: {}", name);
+    println!("Project '{}' created. Run the following command:", name);
+    println!("cd {}", name);
 
     Ok(())
+}
+
+fn get_template_name(template: UltimeProjectTemplate) -> &'static str {
+    match template {
+        UltimeProjectTemplate::Empty => "empty",
+        UltimeProjectTemplate::Blog => "blog",
+    }
 }
 
 fn create_project_dir(from: &Dir, to: &Path, name: &str) -> Result<()> {
@@ -138,97 +148,95 @@ fn create_project_dir(from: &Dir, to: &Path, name: &str) -> Result<()> {
         println!("Creating migration project...");
 
         // Rename files in migrations folder
-        let regex = regex::Regex::new(r"^YYYYMMDD_HHMM(\d{2})_")?;
-
         let migrations_dir_path = to.join("migrations");
-        let migrations_dir = fs::read_dir(&migrations_dir_path)?;
+        if migrations_dir_path.exists() {
+            let regex = Regex::new(r"^YYYYMMDD_HHMM(\d{2})_")?;
 
-        let migration_filenames_to_rename = migrations_dir
-            .filter_map(|entry| match entry {
-                Ok(file) => {
-                    let file_name = file.file_name();
-                    if regex.is_match(file_name.to_str().unwrap_or("")) {
-                        Some(file_name)
-                    } else {
-                        None
+            let migrations_dir = fs::read_dir(&migrations_dir_path)?;
+
+            let migration_filenames_to_rename = migrations_dir
+                .filter_map(|entry| match entry {
+                    Ok(file) => {
+                        let file_name = file.file_name();
+                        if regex.is_match(file_name.to_str().unwrap_or("")) {
+                            Some(file_name)
+                        } else {
+                            None
+                        }
                     }
-                }
-                Err(_) => None,
-            })
-            .collect::<Vec<_>>();
+                    Err(_) => None,
+                })
+                .collect::<Vec<_>>();
 
-        for filename in migration_filenames_to_rename {
-            let filename = filename
-                .to_str()
-                .context("Cannot convert filename to string")?;
+            for filename in migration_filenames_to_rename {
+                let filename = filename
+                    .to_str()
+                    .context("Cannot convert filename to string")?;
 
-            let captures = regex
-                .captures(filename)
-                .context("Cannot retrieve from pattern")?;
-            let seconds = captures
-                .get(1)
-                .context("Cannot retrieve from pattern")?
-                .as_str();
+                let captures = regex
+                    .captures(filename)
+                    .context("Cannot retrieve from pattern")?;
+                let seconds = captures
+                    .get(1)
+                    .context("Cannot retrieve from pattern")?
+                    .as_str();
 
-            let new_filename_prefix = format!("{}{}_", now.format("%Y%m%d_%H%M"), seconds);
-            let new_filename = regex.replace(filename, new_filename_prefix);
+                let new_filename_prefix = format!("{}{}_", now.format("%Y%m%d_%H%M"), seconds);
+                let new_filename = regex.replace(filename, new_filename_prefix);
 
-            let from = format!("{}/{}", migrations_dir_path.display(), filename);
-            let to = format!("{}/{}", migrations_dir_path.display(), new_filename);
+                let from = format!("{}/{}", migrations_dir_path.display(), filename);
+                let to = format!("{}/{}", migrations_dir_path.display(), new_filename);
 
-            fs::rename(from, to)?;
+                fs::rename(from, to)?;
+            }
         }
 
         // Rename files in migrations/down folder
-        let regex = regex::Regex::new(r"^YYYYMMDD_HHMM(\d{2})_")?;
-
         let down_migrations_dir_path = migrations_dir_path.join("down");
-        let down_migrations_dir = fs::read_dir(&down_migrations_dir_path)?;
+        if down_migrations_dir_path.exists() {
+            let regex = Regex::new(r"^YYYYMMDD_HHMM(\d{2})_")?;
 
-        let down_migration_filenames_to_rename = down_migrations_dir
-            .filter_map(|entry| match entry {
-                Ok(file) => {
-                    let file_name = file.file_name();
-                    if regex.is_match(file_name.to_str().unwrap_or("")) {
-                        Some(file_name)
-                    } else {
-                        None
+            let down_migrations_dir = fs::read_dir(&down_migrations_dir_path)?;
+
+            let down_migration_filenames_to_rename = down_migrations_dir
+                .filter_map(|entry| match entry {
+                    Ok(file) => {
+                        let file_name = file.file_name();
+                        if regex.is_match(file_name.to_str().unwrap_or("")) {
+                            Some(file_name)
+                        } else {
+                            None
+                        }
                     }
-                }
-                Err(_) => None,
-            })
-            .collect::<Vec<_>>();
+                    Err(_) => None,
+                })
+                .collect::<Vec<_>>();
 
-        for filename in down_migration_filenames_to_rename {
-            let filename = filename
-                .to_str()
-                .context("Cannot convert filename to string")?;
+            for filename in down_migration_filenames_to_rename {
+                let filename = filename
+                    .to_str()
+                    .context("Cannot convert filename to string")?;
 
-            let captures = regex
-                .captures(filename)
-                .context("Cannot retrieve from pattern")?;
-            let seconds = captures
-                .get(1)
-                .context("Cannot retrieve from pattern")?
-                .as_str();
+                let captures = regex
+                    .captures(filename)
+                    .context("Cannot retrieve from pattern")?;
+                let seconds = captures
+                    .get(1)
+                    .context("Cannot retrieve from pattern")?
+                    .as_str();
 
-            let new_filename_prefix = format!("{}{}_", now.format("%Y%m%d_%H%M"), seconds);
-            let new_filename = regex.replace(filename, new_filename_prefix);
+                let new_filename_prefix = format!("{}{}_", now.format("%Y%m%d_%H%M"), seconds);
+                let new_filename = regex.replace(filename, new_filename_prefix);
 
-            let from = format!("{}/{}", down_migrations_dir_path.display(), filename);
-            let to = format!("{}/{}", down_migrations_dir_path.display(), new_filename);
+                let from = format!("{}/{}", down_migrations_dir_path.display(), filename);
+                let to = format!("{}/{}", down_migrations_dir_path.display(), new_filename);
 
-            fs::rename(from, to)?;
+                fs::rename(from, to)?;
+            }
         }
     }
 
     Ok(())
-}
-
-fn get_template_name(template: UltimeProjectTemplate) -> &'static str {
-    match template {
-        UltimeProjectTemplate::Blog => "blog",
-    }
 }
 
 // 💡 Function extract customized because it is not implemented in the "include_dir" crate.

@@ -1,4 +1,4 @@
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 
 #[derive(Parser, Debug)]
 #[clap(name = "ultime", version, author = "Odonno")]
@@ -8,8 +8,20 @@ pub struct Args {
     pub command: Option<Action>,
 }
 
+#[derive(ValueEnum, Debug, Clone)]
+pub enum UltimeProjectTemplate {
+    Empty,
+    Blog,
+}
+
 #[derive(Subcommand, Debug)]
 pub enum Action {
     /// Create a new ultime project
-    New { name: String },
+    New {
+        /// Name of the project that will be generated
+        name: String,
+        /// Template to use
+        #[clap(long)]
+        template: Option<UltimeProjectTemplate>,
+    },
 }
