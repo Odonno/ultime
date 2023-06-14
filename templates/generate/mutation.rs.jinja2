@@ -1,10 +1,10 @@
 use serde::{Deserialize, Serialize};
 use surrealdb::{sql::Thing, Connection, Result, Surreal};
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct {{ struct_name }} {
 {%- for field in struct_fields %}
-    {{ field.name }}: {{ field.type_str }},
+    pub {{ field.name }}: {{ field.type_str }},
 {%- endfor %}
 }
 

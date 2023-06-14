@@ -13,11 +13,15 @@ use std::{
     process::{Command, Stdio},
     time::Duration,
 };
-use surrealdb::sql::{
-    statements::{
-        DefineEventStatement, DefineFieldStatement, DefineStatement, DefineTableStatement,
+use surrealdb::{
+    engine::remote::ws::Ws,
+    opt::auth::Root,
+    sql::{
+        statements::{
+            DefineEventStatement, DefineFieldStatement, DefineStatement, DefineTableStatement,
+        },
+        Kind, Statement,
     },
-    Kind, Statement,
 };
 
 enum SurrealType {
@@ -32,12 +36,12 @@ struct StructField {
     type_str: String,
 }
 
-pub fn main() -> Result<()> {
+pub async fn main() -> Result<()> {
     if !is_valid_ultime_project() {
         return Err(anyhow!("This is not a valid ultime project"));
     }
 
-    start_surrealdb_instance()?;
+    start_surrealdb_instance().await?;
     generate_db_folder()?;
     start_leptos_app()?;
     let _watcher = watch_to_regenerate_db_folder()?; // 💡 prevent watcher to be dropped
@@ -53,8 +57,9 @@ fn is_valid_ultime_project() -> bool {
     has_cargo_toml
 }
 
-fn start_surrealdb_instance() -> Result<()> {
+async fn start_surrealdb_instance() -> Result<()> {
     let check_surreal_cli = Command::new("surreal")
+        .arg("-h")
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
@@ -64,26 +69,44 @@ fn start_surrealdb_instance() -> Result<()> {
     if check_surreal_cli.success() {
         println!("Start a new SurrealDB instance...");
 
-        let username = "test";
-        let password = "test";
+        let username = "root";
+        let password = "root";
 
-        let start_surrealdb_instance = Command::new("surreal")
+        let _start_surreal_instance = Command::new("surreal")
             .arg("start")
             .arg("--user")
             .arg(username)
             .arg("--pass")
             .arg(password)
             .arg("memory")
-            .spawn()?
-            .wait()?;
+            .spawn()?;
 
-        if start_surrealdb_instance.success() {
-            println!("SurrealDB instance started successfully");
-        } else {
-            return Err(anyhow!("SurrealDB instance failed to start"));
+        // TODO : Read error from child process
+
+        // TODO : Wait until SurrealDB instance is ready
+        println!("SurrealDB instance started successfully");
+
+        std::thread::sleep(Duration::from_secs(1)); // TODO : Wait until SurrealDB instance is ready
+
+        // Try to apply migrations on the SurrealDB instance
+        let db = surrealdb::Surreal::new::<Ws>("localhost:8000").await?;
+
+        db.signin(Root {
+            username: "root",
+            password: "root",
+        })
+        .await?;
+
+        db.use_ns("test").use_db("test").await?;
+
+        println!("Start to apply SurrealDB migrations...");
+
+        let result = surrealdb_migrations::MigrationRunner::new(&db).up().await;
+
+        match result {
+            Ok(_) => println!("SurrealDB migrations applied successfully"),
+            Err(err) => println!("SurrealDB migrations failed to apply: {:?}", err),
         }
-
-        // TODO : Try to apply migrations on the SurrealDB instance
     } else {
         println!("surreal cli does not seem to be installed. Step skipped...");
     }
@@ -312,6 +335,7 @@ fn extract_struct_fields(define_field_statements: Vec<DefineFieldStatement>) -> 
         // TODO : Handle other field types
         let field_type = match define_field_statement.kind {
             Some(Kind::String) => SurrealType::String,
+            Some(Kind::Record(_)) => SurrealType::Id,
             _ => SurrealType::Unknown,
         };
 
@@ -506,11 +530,11 @@ mod tests {
             "use serde::{Deserialize, Serialize};
 use surrealdb::{sql::Thing, Connection, Result, Surreal};
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Post {
-    id: Thing,
-    title: String,
-    content: String,
+    pub id: Thing,
+    pub title: String,
+    pub content: String,
 }
 
 pub async fn get_all_post<C: Connection>(db: &'_ Surreal<C>) -> Result<Vec<Post>> {
@@ -581,11 +605,11 @@ pub async fn delete_post<C: Connection>(db: &'_ Surreal<C>, id: &str) -> Result<
             "use serde::{Deserialize, Serialize};
 use surrealdb::{sql::Thing, Connection, Result, Surreal};
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ScriptMigration {
-    id: Thing,
-    script_name: String,
-    executed_at: String,
+    pub id: Thing,
+    pub script_name: String,
+    pub executed_at: String,
 }
 
 pub async fn get_all_script_migration<C: Connection>(db: &'_ Surreal<C>) -> Result<Vec<ScriptMigration>> {
@@ -638,11 +662,11 @@ pub async fn find_script_migration<C: Connection>(db: &'_ Surreal<C>, id: &str) 
             "use serde::{Deserialize, Serialize};
 use surrealdb::{sql::Thing, Connection, Result, Surreal};
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PublishPostData {
-    id: Thing,
-    title: String,
-    content: String,
+    pub id: Thing,
+    pub title: String,
+    pub content: String,
 }
 
 pub async fn publish_post<C: Connection>(db: &'_ Surreal<C>, data: PublishPostData) -> Result<PublishPostData> {

@@ -39,8 +39,9 @@ pub fn main(name: String, template: Option<UltimeProjectTemplate>) -> Result<()>
         return Err(error);
     }
 
-    println!("Project '{}' created. Run the following command:", name);
+    println!("Project '{}' created. Run the following commands:", name);
     println!("cd {}", name);
+    println!("ultime");
 
     Ok(())
 }

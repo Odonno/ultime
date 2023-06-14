@@ -1,6 +1,9 @@
-pub mod app;
-mod pages;
 use cfg_if::cfg_if;
+
+pub mod app;
+mod db;
+mod models;
+mod pages;
 
 cfg_if! {
 if #[cfg(feature = "hydrate")] {

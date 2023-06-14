@@ -14,8 +14,9 @@ fn create_new_project_with_empty_template() -> Result<()> {
     cmd.assert().success().stdout(
         "Cloning template...
 Creating migration project...
-Project 'ultime-project' created. Run the following command:
-cd ultime-project\n",
+Project 'ultime-project' created. Run the following commands:
+cd ultime-project
+ultime\n",
     );
 
     let my_blog_folder = temp_dir.child("ultime-project");
@@ -191,10 +192,11 @@ playwright/.cache/
         let app_rs_file = src_folder.child("app.rs");
         assert!(app_rs_file.is_file(), "app.rs file should exists");
         app_rs_file.assert(
-            r#"use crate::pages::home::HomePage;
-use leptos::*;
+            r#"use leptos::*;
 use leptos_meta::*;
 use leptos_router::*;
+
+use crate::pages::home::HomePage;
 
 #[component]
 pub fn App(cx: Scope) -> impl IntoView {
@@ -315,8 +317,9 @@ fn create_new_project_with_blog_template() -> Result<()> {
     cmd.assert().success().stdout(
         "Cloning template...
 Creating migration project...
-Project 'my-blog' created. Run the following command:
-cd my-blog\n",
+Project 'my-blog' created. Run the following commands:
+cd my-blog
+ultime\n",
     );
 
     let my_blog_folder = temp_dir.child("my-blog");
@@ -513,10 +516,12 @@ playwright/.cache/
         let app_rs_file = src_folder.child("app.rs");
         assert!(app_rs_file.is_file(), "app.rs file should exists");
         app_rs_file.assert(
-            r#"use crate::pages::home::HomePage;
-use leptos::*;
+            r#"use leptos::*;
 use leptos_meta::*;
 use leptos_router::*;
+
+use crate::pages::home::HomePage;
+use crate::pages::post::PostDetailsPage;
 
 #[component]
 pub fn App(cx: Scope) -> impl IntoView {
@@ -538,6 +543,7 @@ pub fn App(cx: Scope) -> impl IntoView {
             <main>
                 <Routes>
                     <Route path="" view=|cx| view! { cx, <HomePage/> }/>
+                    <Route path="/posts/:id" view=|cx| view! { cx, <PostDetailsPage/> }/>
                 </Routes>
             </main>
         </Router>

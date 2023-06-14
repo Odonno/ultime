@@ -1,7 +1,9 @@
-use crate::pages::home::HomePage;
 use leptos::*;
 use leptos_meta::*;
 use leptos_router::*;
+
+use crate::pages::home::HomePage;
+use crate::pages::post::PostDetailsPage;
 
 #[component]
 pub fn App(cx: Scope) -> impl IntoView {
@@ -23,6 +25,7 @@ pub fn App(cx: Scope) -> impl IntoView {
             <main>
                 <Routes>
                     <Route path="" view=|cx| view! { cx, <HomePage/> }/>
+                    <Route path="/posts/:id" view=|cx| view! { cx, <PostDetailsPage/> }/>
                 </Routes>
             </main>
         </Router>
