@@ -1,19 +1,19 @@
 SELECT 
-    id, 
-    title, 
-    content, 
+    meta::id(id) AS id,
+    title,
+    content,
     status,
     created_at,
     author.username AS author,
     (
         SELECT 
-            id,
+            meta::id(id) AS id,
             content,
             created_at,
             in.username AS author,
             (
                 SELECT 
-                    id,
+                    meta::id(id) AS id,
                     content,
                     created_at,
                     in.username AS author,

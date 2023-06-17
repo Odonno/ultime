@@ -1,9 +1,8 @@
-use serde::{Serialize, Deserialize};
-use surrealdb::sql::Thing;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PostsQueryItem {
-    pub id: Thing,
+    pub id: String,
     pub title: String,
     pub content: String,
     pub status: String,
@@ -14,7 +13,7 @@ pub type PostsQuery = Vec<PostsQueryItem>;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PostQueryComments {
-    pub id: Thing,
+    pub id: String,
     pub content: String,
     pub author: String,
     pub created_at: String,
@@ -23,7 +22,7 @@ pub struct PostQueryComments {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PostQueryItem {
-    pub id: Thing,
+    pub id: String,
     pub title: String,
     pub content: String,
     pub status: String,

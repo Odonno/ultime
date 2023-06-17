@@ -570,11 +570,15 @@ async fn main() -> std::io::Result<()> {
     use leptos::*;
     use leptos_actix::{generate_route_list, LeptosRoutes};
     use my_blog::app::*;
+    use my_blog::api::{FetchBlogPosts, FetchPostDetails};
 
     let conf = get_configuration(None).await.unwrap();
     let addr = conf.leptos_options.site_addr;
     // Generate the list of routes in your Leptos App
     let routes = generate_route_list(|cx| view! { cx, <App/> });
+
+    let _ = FetchBlogPosts::register();
+    let _ = FetchPostDetails::register();
 
     HttpServer::new(move || {
         let leptos_options = &conf.leptos_options;

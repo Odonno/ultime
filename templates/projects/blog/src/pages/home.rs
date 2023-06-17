@@ -1,53 +1,12 @@
 use leptos::*;
 use leptos_router::*;
 
-use crate::models::queries::{PostsQuery, PostsQueryItem};
-
-#[server(FetchBlogPosts, "/api")]
-pub async fn fetch_blog_posts() -> Result<PostsQuery, ServerFnError> {
-    use surrealdb::{engine::remote::ws::Ws, opt::auth::Root, Surreal};
-
-    let db = surrealdb::Surreal::new::<Ws>("localhost:8000")
-        .await
-        .map_err(|_| {
-            ServerFnError::ServerError("Cannot open connection to SurrealDB".to_string())
-        })?;
-
-    db.signin(Root {
-        username: "root",
-        password: "root",
-    })
-    .await
-    .map_err(|_| ServerFnError::ServerError("Cannot signin to SurrealDB".to_string()))?;
-
-    db.use_ns("test")
-        .use_db("test")
-        .await
-        .map_err(|_| ServerFnError::ServerError("Cannot use namespace and database".to_string()))?;
-
-    let query = include_str!("../../queries/posts.surql");
-
-    let posts: PostsQuery = db
-        .query(query)
-        .await
-        .map_err(|_| ServerFnError::ServerError("Cannot get all posts".to_string()))?
-        .take(0)
-        .map_err(|_| ServerFnError::ServerError("Cannot get all posts".to_string()))?;
-
-    Ok(posts)
-}
+use crate::{api::fetch_blog_posts, models::queries::PostsQueryItem};
 
 #[component]
 pub fn HomePage(cx: Scope) -> impl IntoView {
     let fetch_blog_posts_resource =
         create_resource(cx, || (), |_| async move { fetch_blog_posts().await });
-
-    let blog_posts = create_memo(cx, move |_| {
-        fetch_blog_posts_resource
-            .read(cx)
-            .map(|result| result.unwrap())
-            .unwrap_or_else(|| vec![])
-    });
 
     let (title, set_title) = create_signal(cx, "".to_string());
     let (content, set_content) = create_signal(cx, "".to_string());
@@ -80,18 +39,28 @@ pub fn HomePage(cx: Scope) -> impl IntoView {
         </form>
 
         <Transition fallback=move || { view! { cx, <div>"Loading..."</div> } }>
-            <BlogPosts blog_posts={blog_posts} />
+            <BlogPosts fetch_blog_posts_resource={fetch_blog_posts_resource} />
         </Transition>
     }
 }
 
 #[component]
-pub fn BlogPosts(cx: Scope, blog_posts: Memo<Vec<PostsQueryItem>>) -> impl IntoView {
+pub fn BlogPosts(
+    cx: Scope,
+    fetch_blog_posts_resource: Resource<(), Result<Vec<PostsQueryItem>, ServerFnError>>,
+) -> impl IntoView {
+    let posts = move || {
+        fetch_blog_posts_resource
+            .read(cx)
+            .map(|posts| posts.unwrap_or_default())
+            .unwrap_or_default()
+    };
+
     view! {
         cx,
         <ul>
             <For
-                each={blog_posts}
+                each={posts}
                 key=|post| post.id.to_string()
                 view=move |cx, post| {
                     view! {
@@ -106,7 +75,7 @@ pub fn BlogPosts(cx: Scope, blog_posts: Memo<Vec<PostsQueryItem>>) -> impl IntoV
 
 #[component]
 pub fn BlogPost(cx: Scope, post: PostsQueryItem) -> impl IntoView {
-    let href = format!("posts/{}", post.id.id);
+    let href = format!("posts/{}", post.id);
 
     view! {
         cx,
