@@ -12,23 +12,23 @@ pub struct PostsQueryItem {
 pub type PostsQuery = Vec<PostsQueryItem>;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct PostQueryComments {
+pub struct PostByIdQueryComments {
     pub id: String,
     pub content: String,
     pub author: String,
     pub created_at: String,
-    pub comments: Vec<PostQueryComments>,
+    pub comments: Vec<PostByIdQueryComments>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct PostQueryItem {
+pub struct PostByIdQueryItem {
     pub id: String,
     pub title: String,
     pub content: String,
     pub status: String,
     pub author: String,
     pub created_at: String,
-    pub comments: Vec<PostQueryComments>,
+    pub comments: Vec<PostByIdQueryComments>,
 }
 
-pub type PostQuery = Vec<PostQueryItem>;
+pub type PostByIdQuery = Vec<PostByIdQueryItem>;

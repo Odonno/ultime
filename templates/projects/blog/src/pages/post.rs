@@ -3,7 +3,7 @@ use leptos_router::*;
 
 use crate::{
     api::fetch_post_details,
-    models::queries::{PostQueryComments, PostQueryItem},
+    models::queries::{PostByIdQueryComments, PostByIdQueryItem},
 };
 
 #[derive(Params, PartialEq, Clone, Debug)]
@@ -36,7 +36,7 @@ pub fn PostDetailsPage(cx: Scope) -> impl IntoView {
 }
 
 #[component]
-pub fn BlogPost(cx: Scope, post: PostQueryItem) -> impl IntoView {
+pub fn BlogPost(cx: Scope, post: PostByIdQueryItem) -> impl IntoView {
     view! {
         cx,
         <h1>{post.title}</h1>
@@ -49,7 +49,7 @@ pub fn BlogPost(cx: Scope, post: PostQueryItem) -> impl IntoView {
 }
 
 #[component]
-pub fn Comments(cx: Scope, comments: Vec<PostQueryComments>) -> impl IntoView {
+pub fn Comments(cx: Scope, comments: Vec<PostByIdQueryComments>) -> impl IntoView {
     view! {
         cx,
         <ul>

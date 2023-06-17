@@ -6,6 +6,7 @@ use notify::{
     event::{AccessKind, AccessMode},
     EventKind, INotifyWatcher, RecursiveMode, Watcher,
 };
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
@@ -127,8 +128,67 @@ fn start_leptos_app() -> Result<()> {
 fn generate_db_folder() -> Result<()> {
     let src_dir = Path::new("src");
 
-    // TODO : Generate queries
-    let _queries_dir = Path::new("queries");
+    // Generate queries
+    let mut queries_to_generate: HashMap<String, String> = HashMap::new();
+    let mut has_queries_to_generate = false;
+
+    let queries_dir = Path::new("queries");
+    if queries_dir.exists() {
+        let queries_files = queries_dir.read_dir()?;
+
+        for query_file in queries_files {
+            let query_file = query_file?;
+            let query_file_path = query_file.path();
+            let query_file_content = std::fs::read_to_string(&query_file_path)?;
+
+            let parsed_query = surrealdb::sql::parse(&query_file_content)?;
+            let query_statements = parsed_query.0 .0;
+
+            let _is_multi_statements_query = query_statements.len() > 1;
+
+            let variables = extract_query_variables(&query_file_content)?;
+
+            let query_name = query_file_path
+                .file_stem()
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .to_string();
+
+            let response_type = format!("{}_Query", query_name).to_case(Case::Pascal);
+
+            let content =
+                generate_from_query_template(query_name.to_string(), variables, response_type)?;
+
+            queries_to_generate.insert(query_name, content);
+        }
+
+        has_queries_to_generate = !queries_to_generate.is_empty();
+        if has_queries_to_generate {
+            let db_dir = src_dir.join("db");
+            ensures_folder_exists(&db_dir)?;
+
+            let queries_dir = db_dir.join("queries");
+            ensures_folder_exists(&queries_dir)?;
+
+            for (query_name, template) in &queries_to_generate {
+                let generated_query_file_name = format!("{}.rs", query_name);
+                let generated_query_file_path = queries_dir.join(generated_query_file_name);
+
+                std::fs::write(generated_query_file_path, template)?;
+            }
+
+            let queries_mod_file_path = db_dir.join("queries.rs");
+
+            let queries_mod_file_content = queries_to_generate
+                .keys()
+                .map(|table_name| format!("pub mod {};", table_name))
+                .collect::<Vec<_>>()
+                .join("\n");
+
+            std::fs::write(queries_mod_file_path, queries_mod_file_content)?;
+        }
+    }
 
     // Generate crud queries
     let mut schemas_to_generate: HashMap<String, String> = HashMap::new();
@@ -298,7 +358,8 @@ fn generate_db_folder() -> Result<()> {
     }
 
     // Generate db.rs
-    let has_db_changes = has_schemas_to_generate || has_events_to_generate;
+    let has_db_changes =
+        has_queries_to_generate || has_schemas_to_generate || has_events_to_generate;
     if has_db_changes {
         let mod_file_path = src_dir.join("db.rs");
         let mut mod_file_modules = vec![];
@@ -308,6 +369,9 @@ fn generate_db_folder() -> Result<()> {
         }
         if has_events_to_generate {
             mod_file_modules.push("events");
+        }
+        if has_queries_to_generate {
+            mod_file_modules.push("queries");
         }
 
         let mod_file_content = mod_file_modules
@@ -494,6 +558,39 @@ fn generate_from_mutation_template(
     Ok(content)
 }
 
+fn extract_query_variables(input: &str) -> Result<Vec<String>> {
+    let variable_regex = Regex::new(r#"\$([a-zA-Z_][a-zA-Z0-9_]*)"#)?;
+
+    let variables = variable_regex
+        .captures_iter(input)
+        .map(|capture| capture[1].to_owned())
+        .collect();
+
+    Ok(variables)
+}
+
+fn generate_from_query_template(
+    file_name: String,
+    variables: Vec<String>,
+    response_type: String,
+) -> Result<String> {
+    const TEMPLATES_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/templates/generate");
+
+    let template_content = TEMPLATES_DIR
+        .get_file("query.rs.jinja2")
+        .context("Cannot get template 'query.rs.jinja2'")?
+        .contents_utf8()
+        .context("Cannot get template 'query.rs.jinja2'")?
+        .to_string();
+
+    let content = Environment::new().render_str(
+        &template_content,
+        context! { file_name, variables, response_type },
+    )?;
+
+    Ok(content)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -674,5 +771,108 @@ pub async fn publish_post<C: Connection>(db: &'_ Surreal<C>, data: PublishPostDa
     Ok(record)
 }"
         );
+    }
+
+    #[test]
+    fn generate_posts_query_content() {
+        let file_name = "posts";
+        let variables = vec![];
+        let response_type = "PostsQuery";
+
+        let result = generate_from_query_template(
+            file_name.to_string(),
+            variables,
+            response_type.to_string(),
+        )
+        .unwrap();
+
+        assert_eq!(
+            result,
+            "use surrealdb::{Surreal, Connection, Result};
+
+use crate::models::queries::PostsQuery;
+
+pub async fn query_posts<C: Connection>(
+    db: &'_ Surreal<C>
+) -> Result<PostsQuery> {
+    const QUERY: &str = include_str!(\"../../../queries/posts.surql\");
+
+    let result: PostsQuery = db
+        .query(QUERY)
+        .await?
+        .take(0)?;
+
+    Ok(result)
+}"
+        );
+    }
+
+    #[test]
+    fn generate_post_by_id_query_content() {
+        let file_name = "post_by_id";
+        let variables = vec!["post_id".to_string()];
+        let response_type = "PostByIdQuery";
+
+        let result = generate_from_query_template(
+            file_name.to_string(),
+            variables,
+            response_type.to_string(),
+        )
+        .unwrap();
+
+        assert_eq!(
+            result,
+            "use surrealdb::{Surreal, Connection, Result};
+
+use crate::models::queries::PostByIdQuery;
+
+pub async fn query_post_by_id<C: Connection>(
+    db: &'_ Surreal<C>,
+    post_id: &str
+) -> Result<PostByIdQuery> {
+    const QUERY: &str = include_str!(\"../../../queries/post_by_id.surql\");
+
+    let result: PostByIdQuery = db
+        .query(QUERY)
+        .bind((\"post_id\", post_id))
+        .await?
+        .take(0)?;
+
+    Ok(result)
+}"
+        );
+    }
+
+    #[test]
+    fn should_extract_post_id_variable_from_post_by_id_query() {
+        let query_content = r#"SELECT 
+    meta::id(id) AS id,
+    title,
+    content,
+    status,
+    created_at,
+    author.username AS author,
+    (
+        SELECT 
+            meta::id(id) AS id,
+            content,
+            created_at,
+            in.username AS author,
+            (
+                SELECT 
+                    meta::id(id) AS id,
+                    content,
+                    created_at,
+                    in.username AS author,
+                    [] AS comments
+                FROM <-comment
+            ) AS comments
+        FROM <-comment
+    ) AS comments
+FROM type::thing("post", $post_id);"#;
+
+        let variables = extract_query_variables(query_content).unwrap();
+
+        assert_eq!(variables, vec!["post_id".to_string()]);
     }
 }

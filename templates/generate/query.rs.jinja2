@@ -1,0 +1,21 @@
+use surrealdb::{Surreal, Connection, Result};
+
+use crate::models::queries::{{ response_type }};
+
+pub async fn query_{{ file_name }}<C: Connection>(
+    db: &'_ Surreal<C>{%- for variable in variables -%},
+    {{ variable }}: &str
+{%- endfor %}
+) -> Result<{{ response_type }}> {
+    const QUERY: &str = include_str!("../../../queries/{{ file_name }}.surql");
+
+    let result: {{ response_type }} = db
+        .query(QUERY)
+{%- for variable in variables %}
+        .bind(("{{ variable }}", {{ variable }}))
+{%- endfor %}
+        .await?
+        .take(0)?;
+
+    Ok(result)
+}

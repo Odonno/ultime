@@ -28,13 +28,15 @@ The main feature is the automatic of code generation based on your SurrealDB sch
 - `/migrations` · migrations folder from surrealdb-migrations
 - `/queries` · a list of .surql files that contains the specific queries for your project
 - `/src`
-  - `/pages` · list of higher order components that can be used as a route
-  - `/components` · list of components that can be used anywhere
   - `/api` · list of API endpoints
+  - `/components` · list of components that can be used anywhere
   - `/db`
-    - `crud.rs` · functions for basic CRUD operations, generated from `/schemas` files
-    - `queries.rs` · functions to query db, generated from `/queries` files
-    - `mutations.rs` · functions to update db, generated from `/events` files
+    - `/crud` · functions for basic CRUD operations, generated from `/schemas` files
+    - `/queries` · functions to query db, generated from `/queries` files
+    - `/mutations` · functions to update db, generated from `/events` files
+  - `/models` · list of structs used in the app
+    - `queries.rs` · types of the response of each query from `/queries` files (this file is currently not automatically generated)
+  - `/pages` · list of higher order components that can be used as a route
 
 ## Predefined templates
 
