@@ -1,0 +1,14 @@
+use serde::{Deserialize, Serialize};
+use surrealdb::{sql::Thing, Connection, Result, Surreal};
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct {{ struct_name }} {
+{%- for field in struct_fields %}
+    pub {{ field.name }}: {{ field.type_str }},
+{%- endfor %}
+}
+
+pub async fn {{ func_name }}<C: Connection>(db: &'_ Surreal<C>, data: {{ struct_name }}) -> Result<{{ struct_name }}> {
+    let record: {{ struct_name }} = db.create("{{ table_name }}").content(data).await?;
+    Ok(record)
+}

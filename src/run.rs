@@ -190,6 +190,71 @@ fn generate_db_folder() -> Result<()> {
         }
     }
 
+    // Generate mutations
+    let mut mutations_to_generate: HashMap<String, String> = HashMap::new();
+    let mut has_mutations_to_generate = false;
+
+    let mutations_dir = Path::new("mutations");
+    if mutations_dir.exists() {
+        let mutations_files = mutations_dir.read_dir()?;
+
+        for mutation_file in mutations_files {
+            let mutation_file = mutation_file?;
+            let mutation_file_path = mutation_file.path();
+            let mutation_file_content = std::fs::read_to_string(&mutation_file_path)?;
+
+            let parsed_query = surrealdb::sql::parse(&mutation_file_content)?;
+            let mutation_statements = parsed_query.0 .0;
+
+            let _is_multi_statements_query = mutation_statements.len() > 1;
+
+            let variables = extract_query_variables(&mutation_file_content)?;
+
+            let mutation_name = mutation_file_path
+                .file_stem()
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .to_string();
+
+            let response_type = format!("{}_Mutation", mutation_name).to_case(Case::Pascal);
+
+            let content = generate_from_mutation_template(
+                mutation_name.to_string(),
+                variables,
+                response_type,
+            )?;
+
+            mutations_to_generate.insert(mutation_name, content);
+        }
+
+        has_mutations_to_generate = !mutations_to_generate.is_empty();
+        if has_mutations_to_generate {
+            let db_dir = src_dir.join("db");
+            ensures_folder_exists(&db_dir)?;
+
+            let mutations_dir = db_dir.join("mutations");
+            ensures_folder_exists(&mutations_dir)?;
+
+            for (mutation_name, template) in &mutations_to_generate {
+                let generated_mutation_file_name = format!("{}.rs", mutation_name);
+                let generated_mutation_file_path = mutations_dir.join(generated_mutation_file_name);
+
+                std::fs::write(generated_mutation_file_path, template)?;
+            }
+
+            let mutations_mod_file_path = db_dir.join("mutations.rs");
+
+            let mutations_mod_file_content = mutations_to_generate
+                .keys()
+                .map(|table_name| format!("pub mod {};", table_name))
+                .collect::<Vec<_>>()
+                .join("\n");
+
+            std::fs::write(mutations_mod_file_path, mutations_mod_file_content)?;
+        }
+    }
+
     // Generate crud queries
     let mut schemas_to_generate: HashMap<String, String> = HashMap::new();
     let mut has_schemas_to_generate = false;
@@ -266,7 +331,7 @@ fn generate_db_folder() -> Result<()> {
         }
     }
 
-    // Generate mutations
+    // Generate events
     let mut events_to_generate: HashMap<String, String> = HashMap::new();
     let mut has_events_to_generate = false;
 
@@ -319,7 +384,7 @@ fn generate_db_folder() -> Result<()> {
 
                 let struct_fields = extract_struct_fields(define_field_statements);
 
-                let content = generate_from_mutation_template(
+                let content = generate_from_event_template(
                     func_name,
                     table_name.to_string(),
                     struct_name,
@@ -358,8 +423,10 @@ fn generate_db_folder() -> Result<()> {
     }
 
     // Generate db.rs
-    let has_db_changes =
-        has_queries_to_generate || has_schemas_to_generate || has_events_to_generate;
+    let has_db_changes = has_queries_to_generate
+        || has_mutations_to_generate
+        || has_schemas_to_generate
+        || has_events_to_generate;
     if has_db_changes {
         let mod_file_path = src_dir.join("db.rs");
         let mut mod_file_modules = vec![];
@@ -369,6 +436,9 @@ fn generate_db_folder() -> Result<()> {
         }
         if has_events_to_generate {
             mod_file_modules.push("events");
+        }
+        if has_mutations_to_generate {
+            mod_file_modules.push("mutations");
         }
         if has_queries_to_generate {
             mod_file_modules.push("queries");
@@ -535,7 +605,7 @@ fn generate_from_crud_template(
     Ok(content)
 }
 
-fn generate_from_mutation_template(
+fn generate_from_event_template(
     func_name: String,
     table_name: String,
     struct_name: String,
@@ -544,10 +614,10 @@ fn generate_from_mutation_template(
     const TEMPLATES_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/templates/generate");
 
     let template_content = TEMPLATES_DIR
-        .get_file("mutation.rs.jinja2")
-        .context("Cannot get template 'mutation.rs.jinja2'")?
+        .get_file("event.rs.jinja2")
+        .context("Cannot get template 'event.rs.jinja2'")?
         .contents_utf8()
-        .context("Cannot get template 'mutation.rs.jinja2'")?
+        .context("Cannot get template 'event.rs.jinja2'")?
         .to_string();
 
     let content = Environment::new().render_str(
@@ -581,6 +651,28 @@ fn generate_from_query_template(
         .context("Cannot get template 'query.rs.jinja2'")?
         .contents_utf8()
         .context("Cannot get template 'query.rs.jinja2'")?
+        .to_string();
+
+    let content = Environment::new().render_str(
+        &template_content,
+        context! { file_name, variables, response_type },
+    )?;
+
+    Ok(content)
+}
+
+fn generate_from_mutation_template(
+    file_name: String,
+    variables: Vec<String>,
+    response_type: String,
+) -> Result<String> {
+    const TEMPLATES_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/templates/generate");
+
+    let template_content = TEMPLATES_DIR
+        .get_file("mutation.rs.jinja2")
+        .context("Cannot get template 'mutation.rs.jinja2'")?
+        .contents_utf8()
+        .context("Cannot get template 'mutation.rs.jinja2'")?
         .to_string();
 
     let content = Environment::new().render_str(
@@ -746,7 +838,7 @@ pub async fn find_script_migration<C: Connection>(db: &'_ Surreal<C>, id: &str) 
             },
         ];
 
-        let result = generate_from_mutation_template(
+        let result = generate_from_event_template(
             func_name.to_string(),
             table_name.to_string(),
             struct_name.to_string(),
@@ -835,6 +927,44 @@ pub async fn query_post_by_id<C: Connection>(
     let result: PostByIdQuery = db
         .query(QUERY)
         .bind((\"post_id\", post_id))
+        .await?
+        .take(0)?;
+
+    Ok(result)
+}"
+        );
+    }
+
+    #[test]
+    fn generate_comment_on_post_mutation_content() {
+        let file_name = "comment_on_post";
+        let variables = vec!["post_id".to_string(), "content".to_string()];
+        let response_type = "CommentOnPostMutation";
+
+        let result = generate_from_mutation_template(
+            file_name.to_string(),
+            variables,
+            response_type.to_string(),
+        )
+        .unwrap();
+
+        assert_eq!(
+            result,
+            "use surrealdb::{Surreal, Connection, Result};
+
+use crate::models::mutations::CommentOnPostMutation;
+
+pub async fn mutate_comment_on_post<C: Connection>(
+    db: &'_ Surreal<C>,
+    post_id: &str,
+    content: &str
+) -> Result<CommentOnPostMutation> {
+    const QUERY: &str = include_str!(\"../../../mutations/comment_on_post.surql\");
+
+    let result: CommentOnPostMutation = db
+        .query(QUERY)
+        .bind((\"post_id\", post_id))
+        .bind((\"content\", content))
         .await?
         .take(0)?;
 

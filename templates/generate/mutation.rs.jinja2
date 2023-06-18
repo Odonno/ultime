@@ -1,14 +1,21 @@
-use serde::{Deserialize, Serialize};
-use surrealdb::{sql::Thing, Connection, Result, Surreal};
+use surrealdb::{Surreal, Connection, Result};
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct {{ struct_name }} {
-{%- for field in struct_fields %}
-    pub {{ field.name }}: {{ field.type_str }},
+use crate::models::mutations::{{ response_type }};
+
+pub async fn mutate_{{ file_name }}<C: Connection>(
+    db: &'_ Surreal<C>{%- for variable in variables -%},
+    {{ variable }}: &str
 {%- endfor %}
-}
+) -> Result<{{ response_type }}> {
+    const QUERY: &str = include_str!("../../../mutations/{{ file_name }}.surql");
 
-pub async fn {{ func_name }}<C: Connection>(db: &'_ Surreal<C>, data: {{ struct_name }}) -> Result<{{ struct_name }}> {
-    let record: {{ struct_name }} = db.create("{{ table_name }}").content(data).await?;
-    Ok(record)
+    let result: {{ response_type }} = db
+        .query(QUERY)
+{%- for variable in variables %}
+        .bind(("{{ variable }}", {{ variable }}))
+{%- endfor %}
+        .await?
+        .take(0)?;
+
+    Ok(result)
 }
