@@ -23,7 +23,7 @@ pub async fn fetch_post_details(post_id: String) -> Result<PostByIdQuery, Server
         .await
         .map_err(|_| ServerFnError::ServerError("Cannot use namespace and database".to_string()))?;
 
-    let post = query_post_by_id(&db, post_id)
+    let post = query_post_by_id(&db, &post_id)
         .await
         .map_err(|_| ServerFnError::ServerError("Cannot get post details".to_string()))?;
 

@@ -530,6 +530,18 @@ fn watch_to_regenerate_db_folder() -> Result<INotifyWatcher> {
         watcher.watch(events_dir, RecursiveMode::NonRecursive)?;
     }
 
+    let queries_dir = Path::new("queries");
+    if queries_dir.exists() {
+        println!("Watching queries folder...");
+        watcher.watch(queries_dir, RecursiveMode::NonRecursive)?;
+    }
+
+    let mutations_dir = Path::new("mutations");
+    if mutations_dir.exists() {
+        println!("Watching mutations folder...");
+        watcher.watch(mutations_dir, RecursiveMode::NonRecursive)?;
+    }
+
     Ok(watcher)
 }
 
