@@ -1,3 +1,5 @@
+#![feature(result_flattening)]
+
 use cfg_if::cfg_if;
 
 pub mod api;

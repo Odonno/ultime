@@ -292,7 +292,7 @@ fn generate_db_folder() -> Result<()> {
                     })
                     .collect::<Vec<_>>();
 
-                let struct_fields = extract_struct_fields(define_field_statements);
+                let struct_fields = extract_struct_fields(define_field_statements, true);
 
                 let content = generate_from_crud_template(
                     table_name.to_string(),
@@ -382,7 +382,7 @@ fn generate_db_folder() -> Result<()> {
                     })
                     .collect::<Vec<_>>();
 
-                let struct_fields = extract_struct_fields(define_field_statements);
+                let struct_fields = extract_struct_fields(define_field_statements, false);
 
                 let content = generate_from_event_template(
                     func_name,
@@ -460,9 +460,15 @@ fn generate_db_folder() -> Result<()> {
     Ok(())
 }
 
-fn extract_struct_fields(define_field_statements: Vec<DefineFieldStatement>) -> Vec<StructField> {
+fn extract_struct_fields(
+    define_field_statements: Vec<DefineFieldStatement>,
+    with_id: bool,
+) -> Vec<StructField> {
     let mut struct_fields: HashMap<String, SurrealType> = HashMap::new();
-    struct_fields.insert("id".to_string(), SurrealType::Id);
+
+    if with_id {
+        struct_fields.insert("id".to_string(), SurrealType::Id);
+    }
 
     for define_field_statement in define_field_statements {
         let field_name = define_field_statement.name.to_string();
@@ -835,20 +841,10 @@ pub async fn find_script_migration<C: Connection>(db: &'_ Surreal<C>, id: &str) 
         let func_name = "publish_post";
         let table_name = "publish_post";
         let struct_name = "PublishPostData";
-        let struct_fields = vec![
-            StructField {
-                name: "id".to_string(),
-                type_str: "Thing".to_string(),
-            },
-            StructField {
-                name: "title".to_string(),
-                type_str: "String".to_string(),
-            },
-            StructField {
-                name: "content".to_string(),
-                type_str: "String".to_string(),
-            },
-        ];
+        let struct_fields = vec![StructField {
+            name: "post_id".to_string(),
+            type_str: "Thing".to_string(),
+        }];
 
         let result = generate_from_event_template(
             func_name.to_string(),
@@ -865,9 +861,7 @@ use surrealdb::{sql::Thing, Connection, Result, Surreal};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PublishPostData {
-    pub id: Thing,
-    pub title: String,
-    pub content: String,
+    pub post_id: Thing,
 }
 
 pub async fn publish_post<C: Connection>(db: &'_ Surreal<C>, data: PublishPostData) -> Result<PublishPostData> {

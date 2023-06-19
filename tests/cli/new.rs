@@ -356,6 +356,7 @@ leptos_actix = { version = "0.3", optional = true }
 leptos_router = { version = "0.3", default-features = false }
 serde = { version = "1.0.163", features = ["derive"] }
 surrealdb = { version = "1.0.0-beta.9" }
+thiserror = "1"
 wasm-bindgen = "=0.2.86"
 
 [features]
@@ -570,7 +571,7 @@ async fn main() -> std::io::Result<()> {
     use leptos::*;
     use leptos_actix::{generate_route_list, LeptosRoutes};
     use my_blog::app::*;
-    use my_blog::api::{CreateBlogPost, FetchBlogPosts, FetchPostDetails};
+    use my_blog::api::{CreateBlogPost, FetchBlogPosts, FetchPostDetails, PublishPost, UnpublishPost};
 
     let conf = get_configuration(None).await.unwrap();
     let addr = conf.leptos_options.site_addr;
@@ -580,6 +581,8 @@ async fn main() -> std::io::Result<()> {
     let _ = FetchBlogPosts::register();
     let _ = FetchPostDetails::register();
     let _ = CreateBlogPost::register();
+    let _ = PublishPost::register();
+    let _ = UnpublishPost::register();
 
     HttpServer::new(move || {
         let leptos_options = &conf.leptos_options;

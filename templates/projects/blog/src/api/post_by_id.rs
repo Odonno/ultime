@@ -1,11 +1,14 @@
 use leptos::*;
 
-use crate::models::queries::PostByIdQuery;
+use crate::models::queries::PostByIdQueryItem;
 
 #[server(FetchPostDetails, "/api")]
-pub async fn fetch_post_details(post_id: String) -> Result<PostByIdQuery, ServerFnError> {
-    use crate::db::queries::post_by_id::query_post_by_id;
+pub async fn fetch_post_details(
+    post_id: String,
+) -> Result<Option<PostByIdQueryItem>, ServerFnError> {
     use surrealdb::{engine::remote::ws::Ws, opt::auth::Root, Surreal};
+
+    use crate::db::queries::post_by_id::query_post_by_id;
 
     let db = Surreal::new::<Ws>("localhost:8000").await.map_err(|_| {
         ServerFnError::ServerError("Cannot open connection to SurrealDB".to_string())
@@ -26,6 +29,8 @@ pub async fn fetch_post_details(post_id: String) -> Result<PostByIdQuery, Server
     let post = query_post_by_id(&db, &post_id)
         .await
         .map_err(|_| ServerFnError::ServerError("Cannot get post details".to_string()))?;
+
+    let post = post.first().cloned();
 
     Ok(post)
 }
