@@ -1,10 +1,10 @@
-use leptos::*;
+use leptos::{ev::SubmitEvent, *};
 use leptos_router::*;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::{
-    api::{fetch_post_details, publish_post, unpublish_post},
+    api::{fetch_post_details, publish_post, unpublish_post, CommentPostOrComment, CommentTarget},
     models::queries::{PostByIdQueryComments, PostByIdQueryItem},
 };
 
@@ -135,12 +135,21 @@ pub fn BlogPost(
             }
         }}
 
-        <Comments comments={post.comments} />
+        <CommentForm target={CommentTarget::BlogPost(post.id)} fetch_post_details={fetch_post_details} />
+
+        <Comments comments={post.comments} fetch_post_details={fetch_post_details} />
     }
 }
 
 #[component]
-pub fn Comments(cx: Scope, comments: Vec<PostByIdQueryComments>) -> impl IntoView {
+pub fn Comments(
+    cx: Scope,
+    comments: Vec<PostByIdQueryComments>,
+    fetch_post_details: Resource<
+        Result<String, PostDetailsPageError>,
+        Result<PostByIdQueryItem, PostDetailsPageError>,
+    >,
+) -> impl IntoView {
     view! {
         cx,
         <ul>
@@ -153,10 +162,60 @@ pub fn Comments(cx: Scope, comments: Vec<PostByIdQueryComments>) -> impl IntoVie
                         <div>{comment.created_at} " " {comment.author}</div>
                         <p>{comment.content}</p>
 
-                        <Comments comments={comment.comments} />
+                        <CommentForm target={CommentTarget::Comment(comment.id)} fetch_post_details={fetch_post_details} />
+
+                        <Comments comments={comment.comments} fetch_post_details={fetch_post_details} />
                     }
                 }
             />
         </ul>
+    }
+}
+
+#[component]
+pub fn CommentForm(
+    cx: Scope,
+    target: CommentTarget,
+    fetch_post_details: Resource<
+        Result<String, PostDetailsPageError>,
+        Result<PostByIdQueryItem, PostDetailsPageError>,
+    >,
+) -> impl IntoView {
+    let submit_comment = create_server_action::<CommentPostOrComment>(cx);
+
+    let on_submit = move |ev: SubmitEvent| {
+        let data = CommentPostOrComment::from_event(&ev);
+
+        if data.is_err() {
+            ev.prevent_default();
+        }
+
+        let data = data.unwrap();
+
+        if data.content.is_empty() {
+            ev.prevent_default();
+        }
+    };
+
+    let pending = submit_comment.pending();
+
+    create_effect(cx, move |_| match submit_comment.value().get() {
+        Some(Ok(_)) => {
+            fetch_post_details.refetch();
+        }
+        _ => {}
+    });
+
+    // TODO : local storage for textarea content
+
+    view! {
+        cx,
+        <ActionForm action=submit_comment on:submit=on_submit>
+            <input type="hidden" name="target" value=target />
+            <textarea name="content" placeholder="Your comment" />
+            <button type="submit" disabled=pending>
+                "Submit comment"
+            </button>
+        </ActionForm>
     }
 }

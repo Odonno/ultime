@@ -571,7 +571,7 @@ async fn main() -> std::io::Result<()> {
     use leptos::*;
     use leptos_actix::{generate_route_list, LeptosRoutes};
     use my_blog::app::*;
-    use my_blog::api::{CreateBlogPost, FetchBlogPosts, FetchPostDetails, PublishPost, UnpublishPost};
+    use my_blog::api::{CommentPostOrComment, CreateBlogPost, FetchBlogPosts, FetchPostDetails, PublishPost, UnpublishPost};
 
     let conf = get_configuration(None).await.unwrap();
     let addr = conf.leptos_options.site_addr;
@@ -583,6 +583,7 @@ async fn main() -> std::io::Result<()> {
     let _ = CreateBlogPost::register();
     let _ = PublishPost::register();
     let _ = UnpublishPost::register();
+    let _ = CommentPostOrComment::register();
 
     HttpServer::new(move || {
         let leptos_options = &conf.leptos_options;
