@@ -4,7 +4,7 @@ use crate::models::queries::{{ response_type }};
 
 pub async fn query_{{ file_name }}<C: Connection>(
     db: &'_ Surreal<C>{%- for variable in variables -%},
-    {{ variable }}: &str
+    {{ variable.name }}: {{ variable.type_ }}
 {%- endfor %}
 ) -> Result<{{ response_type }}> {
     const QUERY: &str = include_str!("../../../queries/{{ file_name }}.surql");
@@ -12,7 +12,7 @@ pub async fn query_{{ file_name }}<C: Connection>(
     let result: {{ response_type }} = db
         .query(QUERY)
 {%- for variable in variables %}
-        .bind(("{{ variable }}", {{ variable }}))
+        .bind(("{{ variable.name }}", {{ variable.name }}))
 {%- endfor %}
         .await?
         .take(0)?;

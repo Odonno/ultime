@@ -1,3 +1,5 @@
+// $post_id: &str
+
 SELECT 
     meta::id(id) AS id,
     title,

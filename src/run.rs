@@ -646,12 +646,29 @@ fn generate_from_event_template(
     Ok(content)
 }
 
-fn extract_query_variables(input: &str) -> Result<Vec<String>> {
-    let variable_regex = Regex::new(r#"\$([a-zA-Z_][a-zA-Z0-9_]*)"#)?;
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+struct QueryVariables {
+    name: String,
+    type_: String,
+}
 
-    let variables = variable_regex
-        .captures_iter(input)
-        .map(|capture| capture[1].to_owned())
+fn extract_query_variables(input: &str) -> Result<Vec<QueryVariables>> {
+    let variable_regex = Regex::new(r#"^\s*(?:/{2,}|#+)\s*\$(\w+)\s*[:]\s*(\S+)\s*$"#)?;
+
+    let variables = input
+        .lines()
+        .filter_map(|line| {
+            let mut captures = variable_regex.captures_iter(line);
+
+            if let Some(capture) = captures.next() {
+                let name = capture[1].to_string();
+                let type_ = capture[2].to_string();
+
+                Some(QueryVariables { name, type_ })
+            } else {
+                None
+            }
+        })
         .collect();
 
     Ok(variables)
@@ -659,7 +676,7 @@ fn extract_query_variables(input: &str) -> Result<Vec<String>> {
 
 fn generate_from_query_template(
     file_name: String,
-    variables: Vec<String>,
+    variables: Vec<QueryVariables>,
     response_type: String,
 ) -> Result<String> {
     const TEMPLATES_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/templates/generate");
@@ -681,7 +698,7 @@ fn generate_from_query_template(
 
 fn generate_from_mutation_template(
     file_name: String,
-    variables: Vec<String>,
+    variables: Vec<QueryVariables>,
     response_type: String,
 ) -> Result<String> {
     const TEMPLATES_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/templates/generate");
@@ -908,7 +925,10 @@ pub async fn query_posts<C: Connection>(
     #[test]
     fn generate_post_by_id_query_content() {
         let file_name = "post_by_id";
-        let variables = vec!["post_id".to_string()];
+        let variables = vec![QueryVariables {
+            name: "post_id".to_string(),
+            type_: "&str".to_string(),
+        }];
         let response_type = "PostByIdQuery";
 
         let result = generate_from_query_template(
@@ -944,7 +964,16 @@ pub async fn query_post_by_id<C: Connection>(
     #[test]
     fn generate_comment_on_post_mutation_content() {
         let file_name = "comment_on_post";
-        let variables = vec!["post_id".to_string(), "content".to_string()];
+        let variables = vec![
+            QueryVariables {
+                name: "post_id".to_string(),
+                type_: "Option<String>".to_string(),
+            },
+            QueryVariables {
+                name: "content".to_string(),
+                type_: "&str".to_string(),
+            },
+        ];
         let response_type = "CommentOnPostMutation";
 
         let result = generate_from_mutation_template(
@@ -962,7 +991,7 @@ use crate::models::mutations::CommentOnPostMutation;
 
 pub async fn mutate_comment_on_post<C: Connection>(
     db: &'_ Surreal<C>,
-    post_id: &str,
+    post_id: Option<String>,
     content: &str
 ) -> Result<CommentOnPostMutation> {
     const QUERY: &str = include_str!(\"../../../mutations/comment_on_post.surql\");
@@ -980,35 +1009,56 @@ pub async fn mutate_comment_on_post<C: Connection>(
     }
 
     #[test]
+    fn should_extract_no_variable_from_posts_query() {
+        const QUERY_CONTENT: &str = include_str!("../templates/projects/blog/queries/posts.surql");
+
+        let variables = extract_query_variables(QUERY_CONTENT).unwrap();
+
+        assert!(variables.is_empty());
+    }
+
+    #[test]
     fn should_extract_post_id_variable_from_post_by_id_query() {
-        let query_content = r#"SELECT 
-    meta::id(id) AS id,
-    title,
-    content,
-    status,
-    created_at,
-    author.username AS author,
-    (
-        SELECT 
-            meta::id(id) AS id,
-            content,
-            created_at,
-            in.username AS author,
-            (
-                SELECT 
-                    meta::id(id) AS id,
-                    content,
-                    created_at,
-                    in.username AS author,
-                    [] AS comments
-                FROM <-comment
-            ) AS comments
-        FROM <-comment
-    ) AS comments
-FROM type::thing("post", $post_id);"#;
+        const QUERY_CONTENT: &str =
+            include_str!("../templates/projects/blog/queries/post_by_id.surql");
 
-        let variables = extract_query_variables(query_content).unwrap();
+        let variables = extract_query_variables(QUERY_CONTENT).unwrap();
 
-        assert_eq!(variables, vec!["post_id".to_string()]);
+        assert_eq!(
+            variables,
+            vec![QueryVariables {
+                name: "post_id".to_string(),
+                type_: "&str".to_string()
+            }]
+        );
+    }
+    #[test]
+    fn should_extract_multiple_variables_from_comment_mutation() {
+        const QUERY_CONTENT: &str =
+            include_str!("../templates/projects/blog/mutations/comment.surql");
+
+        let variables = extract_query_variables(QUERY_CONTENT).unwrap();
+
+        assert_eq!(
+            variables,
+            vec![
+                QueryVariables {
+                    name: "user_id".to_string(),
+                    type_: "&str".to_string()
+                },
+                QueryVariables {
+                    name: "post_id".to_string(),
+                    type_: "Option<String>".to_string()
+                },
+                QueryVariables {
+                    name: "comment_id".to_string(),
+                    type_: "Option<String>".to_string()
+                },
+                QueryVariables {
+                    name: "content".to_string(),
+                    type_: "&str".to_string()
+                },
+            ]
+        );
     }
 }
