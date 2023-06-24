@@ -31,21 +31,26 @@ pub fn HomePage(cx: Scope) -> impl IntoView {
 
     view! {
         cx,
-        <h1>"Welcome to my blog!"</h1>
+        <header class="post-list-header">
+            <h1>"Welcome to my blog!"</h1>
+        </header>
 
-        <ActionForm action=create_blog_post on:submit=on_submit>
+        <ActionForm action=create_blog_post on:submit=on_submit class="new-post-form">
             <input
                 type="text"
                 name="title"
                 placeholder="Title"
             />
-            <input
+            <textarea
                 type="text"
                 name="content"
                 placeholder="Content"
+                rows=4
             />
 
-            <button type="submit" disabled=pending>"Create blog post."</button>
+            <div>
+                <button type="submit" disabled=pending>"Create blog post"</button>
+            </div>
         </ActionForm>
 
         <Transition fallback=move || { view! { cx, <div>"Loading..."</div> } }>
@@ -68,7 +73,7 @@ pub fn BlogPosts(
 
     view! {
         cx,
-        <ul>
+        <ul class="post-list">
             <For
                 each={posts}
                 key=|post| post.id.to_string()
@@ -91,11 +96,14 @@ pub fn BlogPost(cx: Scope, post: PostsQueryItem) -> impl IntoView {
         cx,
         <li>
             <A href={href}>
-                <h3>{post.title}</h3>
-                <p>{post.content}</p>
+                <h2>{post.title}</h2>
+                <p inner_html={post.content} />
 
-                <div>{post.status}</div>
-                <div>"Comments: " {post.number_of_comments}</div>
+                <div class="post-list-footer">
+                    <span>{post.status}</span>
+                    <span>" | "</span>
+                    <span>{post.number_of_comments} " comments"</span>
+                </div>
             </A>
         </li>
     }

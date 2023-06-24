@@ -1,3 +1,4 @@
+use chrono::DateTime;
 use leptos::{ev::SubmitEvent, *};
 use leptos_router::*;
 use serde::{Deserialize, Serialize};
@@ -94,50 +95,62 @@ pub fn BlogPost(
 
     let post_id = post.id.to_string();
 
+    let created_at = DateTime::parse_from_rfc3339(&post.created_at).unwrap_or(DateTime::default());
+    let created_at = created_at.format("%B %e, %Y %H:%M").to_string();
+
     view! {
         cx,
-        <h1>{post.title}</h1>
-        <div>{post.status}</div>
-        <div>{post.created_at} " " {post.author}</div>
-        <p>{post.content}</p>
+        <header class="post-details-header">
+            <h1>{post.title}</h1>
 
-        {move || {
-            let post_id = post_id.to_string();
+            <div class="post-details-header-infos">
+                <span>{post.status}</span>
+                <span>" | "</span>
+                <span>{created_at} " by " {post.author}</span>
+            </div>
 
-            if is_draft {
-                let publish_closure = move |post_id| {
-                    spawn_local(async move {
-                        let _ = publish_post(post_id).await;
-                        fetch_post_details.refetch();
-                    });
-                };
+            <p inner_html={post.content} />
 
-                view! {
-                    cx,
-                    <button type="button" on:click=move |_| publish_closure(post_id.to_string())>
-                        "Publish post"
-                    </button>
+            {move || {
+                let post_id = post_id.to_string();
+
+                if is_draft {
+                    let publish_closure = move |post_id| {
+                        spawn_local(async move {
+                            let _ = publish_post(post_id).await;
+                            fetch_post_details.refetch();
+                        });
+                    };
+
+                    view! {
+                        cx,
+                        <button type="button" on:click=move |_| publish_closure(post_id.to_string())>
+                            "Publish post"
+                        </button>
+                    }
+                } else {
+                    let unpublish_closure = move |post_id| {
+                        spawn_local(async move {
+                            let _ = unpublish_post(post_id).await;
+                            fetch_post_details.refetch();
+                        });
+                    };
+
+                    view! {
+                        cx,
+                        <button type="button" on:click=move |_| unpublish_closure(post_id.to_string())>
+                            "Unpublish post"
+                        </button>
+                    }
                 }
-            } else {
-                let unpublish_closure = move |post_id| {
-                    spawn_local(async move {
-                        let _ = unpublish_post(post_id).await;
-                        fetch_post_details.refetch();
-                    });
-                };
+            }}
+        </header>
 
-                view! {
-                    cx,
-                    <button type="button" on:click=move |_| unpublish_closure(post_id.to_string())>
-                        "Unpublish post"
-                    </button>
-                }
-            }
-        }}
+        <section class="comment-section">
+            <CommentForm target={CommentTarget::BlogPost(post.id)} fetch_post_details={fetch_post_details} />
 
-        <CommentForm target={CommentTarget::BlogPost(post.id)} fetch_post_details={fetch_post_details} />
-
-        <Comments comments={post.comments} fetch_post_details={fetch_post_details} />
+            <Comments comments={post.comments} fetch_post_details={fetch_post_details} />
+        </section>
     }
 }
 
@@ -152,19 +165,30 @@ pub fn Comments(
 ) -> impl IntoView {
     view! {
         cx,
-        <ul>
+        <ul class="comment-list">
             <For
                 each={move || comments.clone()}
                 key=|comment| comment.id.to_string()
                 view=move |cx, comment| {
+                    let created_at = DateTime::parse_from_rfc3339(&comment.created_at)
+                        .unwrap_or(DateTime::default());
+                    let created_at = created_at.format("%B %e, %Y %H:%M").to_string();
+
                     view! {
                         cx,
-                        <div>{comment.created_at} " " {comment.author}</div>
-                        <p>{comment.content}</p>
+                        <section class="comment-section">
+                            <div class="comment-infos">
+                                <span>{created_at}</span>
+                                <span>" by "</span>
+                                <span>{comment.author}</span>
+                            </div>
 
-                        <CommentForm target={CommentTarget::Comment(comment.id)} fetch_post_details={fetch_post_details} />
+                            <p>{comment.content}</p>
 
-                        <Comments comments={comment.comments} fetch_post_details={fetch_post_details} />
+                            <CommentForm target={CommentTarget::Comment(comment.id)} fetch_post_details={fetch_post_details} />
+
+                            <Comments comments={comment.comments} fetch_post_details={fetch_post_details} />
+                        </section>
                     }
                 }
             />
@@ -213,7 +237,7 @@ pub fn CommentForm(
         <ActionForm action=submit_comment on:submit=on_submit>
             <input type="hidden" name="target" value=target />
             <textarea name="content" placeholder="Your comment" />
-            <button type="submit" disabled=pending>
+            <button type="submit" class="submit-comment-button" disabled=pending>
                 "Submit comment"
             </button>
         </ActionForm>
