@@ -6,6 +6,9 @@ use clap::{Parser, Subcommand, ValueEnum};
 pub struct Args {
     #[command(subcommand)]
     pub command: Option<Action>,
+    /// Open browser when app is launched
+    #[clap(short, long)]
+    pub open: bool,
 }
 
 #[derive(ValueEnum, Debug, Clone)]

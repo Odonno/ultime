@@ -13,7 +13,7 @@ async fn main() -> Result<()> {
     let args = Args::parse();
 
     match args.command {
-        None => run::main().await,
+        None => run::main(args.open).await,
         Some(command) => match command {
             Action::New { name, template } => new::main(name, template),
         },

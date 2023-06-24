@@ -37,14 +37,14 @@ struct StructField {
     type_str: String,
 }
 
-pub async fn main() -> Result<()> {
+pub async fn main(open: bool) -> Result<()> {
     if !is_valid_ultime_project() {
         return Err(anyhow!("This is not a valid ultime project"));
     }
 
     start_surrealdb_instance().await?;
     generate_db_folder()?;
-    start_leptos_app()?;
+    start_leptos_app(open)?;
     let _watcher = watch_to_regenerate_db_folder()?; // 💡 prevent watcher to be dropped
 
     // 💡 infinite loop to keep the process alive
@@ -115,12 +115,25 @@ async fn start_surrealdb_instance() -> Result<()> {
     Ok(())
 }
 
-fn start_leptos_app() -> Result<()> {
+fn start_leptos_app(open: bool) -> Result<()> {
     println!("Start leptos app...");
     let _start_leptos_app = Command::new("cargo").arg("leptos").arg("watch").spawn()?;
 
     // TODO : Handle error if port (3000) already in use
     // TODO : Use a different port if 3000 is already in use
+
+    if open {
+        open_app_in_browser()?;
+    }
+
+    Ok(())
+}
+
+fn open_app_in_browser() -> Result<()> {
+    const APP_URL: &str = "http://localhost:3000";
+
+    println!("Opening app in browser...");
+    open::that(APP_URL)?;
 
     Ok(())
 }
