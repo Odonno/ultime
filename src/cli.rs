@@ -43,4 +43,10 @@ pub enum GenerateAction {
         #[clap(short, long)]
         watch: bool,
     },
+    /// Generate a new leptos component inside the `/components` folder
+    #[clap(aliases = vec!["c"])]
+    Component {
+        /// Name of the component to generate
+        name: String,
+    },
 }

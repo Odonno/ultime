@@ -19,6 +19,7 @@ async fn main() -> Result<()> {
             Action::New { name, template } => new::main(name, template),
             Action::Generate { command } => match command {
                 GenerateAction::Db { watch } => generate::db::main(watch),
+                GenerateAction::Component { name } => generate::component::main(name),
             },
         },
     }
