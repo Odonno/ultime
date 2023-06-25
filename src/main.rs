@@ -21,6 +21,7 @@ async fn main() -> Result<()> {
                 GenerateAction::Db { watch } => generate::db::main(watch),
                 GenerateAction::Component { name } => generate::component::main(name),
                 GenerateAction::Page { name } => generate::page::main(name),
+                GenerateAction::Endpoint { name } => generate::endpoint::main(name),
             },
         },
     }

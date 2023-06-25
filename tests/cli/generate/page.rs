@@ -4,7 +4,7 @@ use assert_fs::{fixture::PathChild, prelude::PathAssert};
 use crate::helpers::*;
 
 #[test]
-fn generate_new_leptos_component() -> Result<()> {
+fn generate_new_leptos_page() -> Result<()> {
     let temp_dir = assert_fs::TempDir::new()?;
 
     {

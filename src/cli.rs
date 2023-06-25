@@ -55,4 +55,9 @@ pub enum GenerateAction {
         /// Name of the page to generate
         name: String,
     },
+    /// Generate a new leptos endpoint inside the `/api` folder
+    Endpoint {
+        /// Name of the api endpoint to generate
+        name: String,
+    },
 }
