@@ -27,4 +27,20 @@ pub enum Action {
         #[clap(long)]
         template: Option<UltimeProjectTemplate>,
     },
+    /// Generate new files through templates
+    #[clap(aliases = vec!["g"])]
+    Generate {
+        #[command(subcommand)]
+        command: GenerateAction,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+pub enum GenerateAction {
+    /// Generate `db` module inside the `/db` folder
+    Db {
+        /// Watch file changes to re-generate the `db` module
+        #[clap(short, long)]
+        watch: bool,
+    },
 }

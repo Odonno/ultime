@@ -1,10 +1,11 @@
 use anyhow::Result;
 use clap::Parser;
-use cli::Action;
+use cli::{Action, GenerateAction};
 
 use crate::cli::Args;
 
 mod cli;
+mod generate;
 mod new;
 mod run;
 
@@ -16,6 +17,9 @@ async fn main() -> Result<()> {
         None => run::main(args.open).await,
         Some(command) => match command {
             Action::New { name, template } => new::main(name, template),
+            Action::Generate { command } => match command {
+                GenerateAction::Db { watch } => generate::db::main(watch),
+            },
         },
     }
 }
