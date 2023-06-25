@@ -17,7 +17,7 @@ use surrealdb::sql::{
     statements::{
         DefineEventStatement, DefineFieldStatement, DefineStatement, DefineTableStatement,
     },
-    Kind, Statement,
+    Function, Kind, Statement, Value,
 };
 
 enum SurrealType {
@@ -309,6 +309,9 @@ pub fn generate_db_folder() -> Result<()> {
                     .filter(|define_field_statement| {
                         define_field_statement.what.to_string() == table_name
                     })
+                    .filter(|define_field_statement| {
+                        is_value_param_used(define_field_statement.value.clone())
+                    })
                     .collect::<Vec<_>>();
 
                 let struct_fields = extract_struct_fields(define_field_statements, false);
@@ -488,6 +491,46 @@ fn extract_define_event_statements(statements: Vec<Statement>) -> Vec<DefineEven
             _ => None,
         })
         .collect::<Vec<_>>()
+}
+
+fn is_value_param_used(value_statement: Option<Value>) -> bool {
+    match value_statement {
+        Some(value) => match value {
+            Value::None => false,
+            Value::Null => false,
+            Value::False => false,
+            Value::True => false,
+            Value::Number(_) => false,
+            Value::Strand(_) => false,
+            Value::Duration(_) => false,
+            Value::Datetime(_) => false,
+            Value::Uuid(_) => false,
+            Value::Array(_) => false,
+            Value::Object(_) => false,
+            Value::Geometry(_) => false,
+            Value::Bytes(_) => false,
+            Value::Param(param) => param.0 .0 == "value",
+            Value::Thing(_) => false,
+            Value::Constant(_) => false,
+            Value::Function(function) => match *function {
+                Function::Cast(_, value) => is_value_param_used(Some(value)),
+                Function::Normal(_, values) => values
+                    .iter()
+                    .any(|value| is_value_param_used(Some(value.clone()))),
+                Function::Custom(_, values) => values
+                    .iter()
+                    .any(|value| is_value_param_used(Some(value.clone()))),
+                Function::Script(_, values) => values
+                    .iter()
+                    .any(|value| is_value_param_used(Some(value.clone()))),
+            },
+            Value::Expression(expr) => {
+                is_value_param_used(Some(expr.l)) || is_value_param_used(Some(expr.r))
+            }
+            _ => true,
+        },
+        _ => true,
+    }
 }
 
 fn extract_struct_fields(
