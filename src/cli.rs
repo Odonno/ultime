@@ -49,4 +49,10 @@ pub enum GenerateAction {
         /// Name of the component to generate
         name: String,
     },
+    /// Generate a new leptos page inside the `/pages` folder
+    #[clap(aliases = vec!["p"])]
+    Page {
+        /// Name of the page to generate
+        name: String,
+    },
 }

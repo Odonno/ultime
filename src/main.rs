@@ -20,6 +20,7 @@ async fn main() -> Result<()> {
             Action::Generate { command } => match command {
                 GenerateAction::Db { watch } => generate::db::main(watch),
                 GenerateAction::Component { name } => generate::component::main(name),
+                GenerateAction::Page { name } => generate::page::main(name),
             },
         },
     }
