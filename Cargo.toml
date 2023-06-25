@@ -1,6 +1,6 @@
 [package]
 name = "ultime"
-version = "0.0.3"
+version = "0.0.4"
 description = "The ultimate full-stack experience"
 authors = ["David Bottiau"]
 repository = "https://github.com/Odonno/ultime/"
