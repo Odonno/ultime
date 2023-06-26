@@ -4,8 +4,8 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct QueryVariable {
-    name: String,
-    type_: String,
+    pub name: String,
+    pub type_: String,
 }
 
 pub fn extract_query_variables(input: &str) -> Result<Vec<QueryVariable>> {

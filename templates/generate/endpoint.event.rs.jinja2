@@ -1,0 +1,38 @@
+use leptos::*;
+
+use crate::db::events::{{ event.short_name }}::{{ event.data_type }};
+
+#[server({{ endpoint_name }}, "/api")]
+pub async fn {{ function_name }}(
+{%- for param in event.params %}
+    {{ param.name }}: {{ param.type_ }},
+{%- if loop.last %}
+{% endif -%}
+{%- endfor -%}
+) -> Result<(), ServerFnError> {
+    use surrealdb::{engine::remote::ws::Ws, Surreal, opt::auth::Root};
+
+    let db = Surreal::new::<Ws>("localhost:8000")
+        .await
+        .map_err(|_| ServerFnError::ServerError("Cannot open connection to SurrealDB".to_string()))?;
+
+    db
+        .signin(Root {
+            username: "root",
+            password: "root",
+        })
+        .await
+        .map_err(|_| ServerFnError::ServerError("Cannot signin to SurrealDB".to_string()))?;
+
+    db
+        .use_ns("test")
+        .use_db("test")
+        .await
+        .map_err(|_| ServerFnError::ServerError("Cannot use namespace and database".to_string()))?;
+
+    crate::db::events::{{ event.short_name }}::{{ event.short_name }}(&db, data)
+        .await
+        .map_err(|_| ServerFnError::ServerError("Cannot apply event {{ event.short_name }}".to_string()))?;
+
+    Ok(())
+}

@@ -60,10 +60,13 @@ pub enum GenerateAction {
         /// Name of the api endpoint to generate
         name: String,
         /// Use a SurrealDB query from `/queries` to generate the endpoint
-        #[clap(long, conflicts_with("from_mutation"))]
+        #[clap(long, conflicts_with_all(&["from_mutation", "from_event"]))]
         from_query: Option<String>,
         /// Use a SurrealDB query from `/mutations` to generate the endpoint
-        #[clap(long, conflicts_with("from_query"))]
+        #[clap(long, conflicts_with_all(&["from_query", "from_event"]))]
         from_mutation: Option<String>,
+        /// Use a SurrealDB query from `/events` to generate the endpoint
+        #[clap(long, conflicts_with_all(&["from_query", "from_mutation"]))]
+        from_event: Option<String>,
     },
 }

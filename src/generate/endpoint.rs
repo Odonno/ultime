@@ -11,20 +11,23 @@ pub struct GenerateEndpointArgs {
     pub name: String,
     pub from_query: Option<String>,
     pub from_mutation: Option<String>,
+    pub from_event: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct QueryDetailsForEndpoint {
+struct DetailsForEndpoint {
     name: String,
     short_name: String,
+    data_type: Option<String>,
     output_type: String,
     params: Vec<QueryVariable>,
 }
 
 enum EndpointTypeGenerated {
     Empty,
-    Query(QueryDetailsForEndpoint),
-    Mutation(QueryDetailsForEndpoint),
+    Query(DetailsForEndpoint),
+    Mutation(DetailsForEndpoint),
+    Event(DetailsForEndpoint),
 }
 
 pub fn main(args: GenerateEndpointArgs) -> Result<()> {
@@ -32,16 +35,18 @@ pub fn main(args: GenerateEndpointArgs) -> Result<()> {
         name,
         from_query,
         from_mutation,
+        from_event,
     } = args;
 
     let query = get_query_details_for_endpoint(from_query)?;
     let mutation = get_mutation_details_for_endpoint(from_mutation)?;
+    let event = get_event_details_for_endpoint(from_event)?;
 
-    let endpoint_type_generated = match (query.clone(), mutation.clone()) {
-        (None, None) => EndpointTypeGenerated::Empty,
-        (Some(query), None) => EndpointTypeGenerated::Query(query),
-        (None, Some(mutation)) => EndpointTypeGenerated::Mutation(mutation),
-        _ => return Err(anyhow!("Failed to generate endpoint")),
+    let endpoint_type_generated = match (query.clone(), mutation.clone(), event.clone()) {
+        (None, None, None) => EndpointTypeGenerated::Empty,
+        (Some(query), _, _) => EndpointTypeGenerated::Query(query),
+        (_, Some(mutation), _) => EndpointTypeGenerated::Mutation(mutation),
+        (_, _, Some(event)) => EndpointTypeGenerated::Event(event),
     };
 
     let src_dir = Path::new("src");
@@ -66,7 +71,7 @@ pub fn main(args: GenerateEndpointArgs) -> Result<()> {
 
     let content = env.render_str(
         &template_content,
-        context! { endpoint_name, function_name, query, mutation },
+        context! { endpoint_name, function_name, query, mutation, event },
     )?;
 
     let file_name = name.to_case(Case::Snake);
@@ -91,7 +96,7 @@ fn ensures_folder_exists(dir_path: &PathBuf) -> Result<()> {
 
 fn get_query_details_for_endpoint(
     from_query: Option<String>,
-) -> Result<Option<QueryDetailsForEndpoint>> {
+) -> Result<Option<DetailsForEndpoint>> {
     let result = match from_query {
         Some(from_query) => {
             let queries_dir = Path::new("queries");
@@ -114,9 +119,10 @@ fn get_query_details_for_endpoint(
 
             let params = extract_query_variables(&query_content)?;
 
-            let details = QueryDetailsForEndpoint {
+            let details = DetailsForEndpoint {
                 name: format!("query-{}", query_name).to_case(Case::Snake),
                 short_name: query_name.to_case(Case::Snake),
+                data_type: None,
                 output_type,
                 params,
             };
@@ -131,7 +137,7 @@ fn get_query_details_for_endpoint(
 
 fn get_mutation_details_for_endpoint(
     from_mutation: Option<String>,
-) -> Result<Option<QueryDetailsForEndpoint>> {
+) -> Result<Option<DetailsForEndpoint>> {
     let result = match from_mutation {
         Some(from_query) => {
             let mutations_dir = Path::new("mutations");
@@ -154,9 +160,53 @@ fn get_mutation_details_for_endpoint(
 
             let params = extract_query_variables(&mutation_content)?;
 
-            let details = QueryDetailsForEndpoint {
+            let details = DetailsForEndpoint {
                 name: format!("mutate-{}", mutation_name).to_case(Case::Snake),
                 short_name: mutation_name.to_case(Case::Snake),
+                data_type: None,
+                output_type,
+                params,
+            };
+
+            Some(details)
+        }
+        None => None,
+    };
+
+    Ok(result)
+}
+
+fn get_event_details_for_endpoint(
+    from_event: Option<String>,
+) -> Result<Option<DetailsForEndpoint>> {
+    let result = match from_event {
+        Some(from_event) => {
+            let events_dir = Path::new("events");
+
+            let event_name = get_query_name(from_event);
+
+            let event_file_name = format!("{}.surql", event_name);
+            let event_file = events_dir.join(&event_file_name);
+
+            if !event_file.exists() {
+                return Err(anyhow!(format!(
+                    "Event '{}' does not exist",
+                    event_file_name
+                )));
+            }
+
+            let output_type = "()".to_string();
+            let data_type = format!("{}-data", event_name).to_case(Case::Pascal);
+
+            let params = vec![QueryVariable {
+                name: "data".to_string(),
+                type_: data_type.to_string(),
+            }];
+
+            let details = DetailsForEndpoint {
+                name: event_name.to_case(Case::Snake),
+                short_name: event_name.to_case(Case::Snake),
+                data_type: Some(data_type),
                 output_type,
                 params,
             };
@@ -186,6 +236,7 @@ fn get_template_name(endpoint_type_generated: EndpointTypeGenerated) -> String {
         EndpointTypeGenerated::Empty => "empty",
         EndpointTypeGenerated::Query(_) => "query",
         EndpointTypeGenerated::Mutation(_) => "mutation",
+        EndpointTypeGenerated::Event(_) => "event",
     };
 
     format!("endpoint.{}.rs.jinja2", sub_template_name)
