@@ -105,10 +105,10 @@ In order to differentiate internal variables and input variables, we established
 The following mutation...
 
 ```sql
-// $user_id: &str
+// $user_id: String
 // $post_id: Option<String>
 // $comment_id: Option<String>
-// $content: &str
+// $content: String
 
 LET $user = (SELECT * FROM type::thing("user", $user_id));
 
@@ -123,10 +123,10 @@ SET content = $content;
 ```rust
 pub async fn mutate_comment<C: Connection>(
     db: &'_ Surreal<C>,
-    user_id: &str,
+    user_id: String,
     post_id: Option<String>,
     comment_id: Option<String>,
-    content: &str
+    content: String
 ) -> Result<CommentMutation> {
     const QUERY: &str = include_str!("../../../mutations/comment.surql");
 

@@ -1,7 +1,7 @@
-// $user_id: &str
+// $user_id: String
 // $post_id: Option<String>
 // $comment_id: Option<String>
-// $content: &str
+// $content: String
 
 LET $user = (SELECT * FROM type::thing("user", $user_id));
 

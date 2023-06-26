@@ -1,4 +1,4 @@
-// $post_id: &str
+// $post_id: String
 
 SELECT 
     meta::id(id) AS id,

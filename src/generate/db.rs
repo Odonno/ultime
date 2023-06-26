@@ -6,7 +6,6 @@ use notify::{
     event::{AccessKind, AccessMode},
     EventKind, INotifyWatcher, RecursiveMode, Watcher,
 };
-use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
@@ -20,6 +19,8 @@ use surrealdb::sql::{
     Function, Kind, Statement, Value,
 };
 
+use super::common::{extract_query_variables, QueryVariable};
+
 enum SurrealType {
     Id,
     String,
@@ -30,12 +31,6 @@ enum SurrealType {
 struct StructField {
     name: String,
     type_str: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-struct QueryVariables {
-    name: String,
-    type_: String,
 }
 
 pub fn main(watch: bool) -> Result<()> {
@@ -573,28 +568,6 @@ fn extract_struct_fields(
     struct_fields
 }
 
-fn extract_query_variables(input: &str) -> Result<Vec<QueryVariables>> {
-    let variable_regex = Regex::new(r#"^\s*(?:/{2,}|#+)\s*\$(\w+)\s*[:]\s*(\S+)\s*$"#)?;
-
-    let variables = input
-        .lines()
-        .filter_map(|line| {
-            let mut captures = variable_regex.captures_iter(line);
-
-            if let Some(capture) = captures.next() {
-                let name = capture[1].to_string();
-                let type_ = capture[2].to_string();
-
-                Some(QueryVariables { name, type_ })
-            } else {
-                None
-            }
-        })
-        .collect();
-
-    Ok(variables)
-}
-
 fn generate_from_crud_template(
     table_name: String,
     struct_name: String,
@@ -642,7 +615,7 @@ fn generate_from_event_template(
 
 fn generate_from_query_template(
     file_name: String,
-    variables: Vec<QueryVariables>,
+    variables: Vec<QueryVariable>,
     response_type: String,
 ) -> Result<String> {
     const TEMPLATES_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/templates/generate");
@@ -664,7 +637,7 @@ fn generate_from_query_template(
 
 fn generate_from_mutation_template(
     file_name: String,
-    variables: Vec<QueryVariables>,
+    variables: Vec<QueryVariable>,
     response_type: String,
 ) -> Result<String> {
     const TEMPLATES_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/templates/generate");
@@ -885,148 +858,6 @@ pub async fn query_posts<C: Connection>(
 
     Ok(result)
 }"
-        );
-    }
-
-    #[test]
-    fn generate_post_by_id_query_content() {
-        let file_name = "post_by_id";
-        let variables = vec![QueryVariables {
-            name: "post_id".to_string(),
-            type_: "&str".to_string(),
-        }];
-        let response_type = "PostByIdQuery";
-
-        let result = generate_from_query_template(
-            file_name.to_string(),
-            variables,
-            response_type.to_string(),
-        )
-        .unwrap();
-
-        assert_eq!(
-            result,
-            "use surrealdb::{Surreal, Connection, Result};
-
-use crate::models::queries::PostByIdQuery;
-
-pub async fn query_post_by_id<C: Connection>(
-    db: &'_ Surreal<C>,
-    post_id: &str
-) -> Result<PostByIdQuery> {
-    const QUERY: &str = include_str!(\"../../../queries/post_by_id.surql\");
-
-    let result: PostByIdQuery = db
-        .query(QUERY)
-        .bind((\"post_id\", post_id))
-        .await?
-        .take(0)?;
-
-    Ok(result)
-}"
-        );
-    }
-
-    #[test]
-    fn generate_comment_on_post_mutation_content() {
-        let file_name = "comment_on_post";
-        let variables = vec![
-            QueryVariables {
-                name: "post_id".to_string(),
-                type_: "Option<String>".to_string(),
-            },
-            QueryVariables {
-                name: "content".to_string(),
-                type_: "&str".to_string(),
-            },
-        ];
-        let response_type = "CommentOnPostMutation";
-
-        let result = generate_from_mutation_template(
-            file_name.to_string(),
-            variables,
-            response_type.to_string(),
-        )
-        .unwrap();
-
-        assert_eq!(
-            result,
-            "use surrealdb::{Surreal, Connection, Result};
-
-use crate::models::mutations::CommentOnPostMutation;
-
-pub async fn mutate_comment_on_post<C: Connection>(
-    db: &'_ Surreal<C>,
-    post_id: Option<String>,
-    content: &str
-) -> Result<CommentOnPostMutation> {
-    const QUERY: &str = include_str!(\"../../../mutations/comment_on_post.surql\");
-
-    let result: CommentOnPostMutation = db
-        .query(QUERY)
-        .bind((\"post_id\", post_id))
-        .bind((\"content\", content))
-        .await?
-        .take(0)?;
-
-    Ok(result)
-}"
-        );
-    }
-
-    #[test]
-    fn should_extract_no_variable_from_posts_query() {
-        const QUERY_CONTENT: &str =
-            include_str!("../../templates/projects/blog/queries/posts.surql");
-
-        let variables = extract_query_variables(QUERY_CONTENT).unwrap();
-
-        assert!(variables.is_empty());
-    }
-
-    #[test]
-    fn should_extract_post_id_variable_from_post_by_id_query() {
-        const QUERY_CONTENT: &str =
-            include_str!("../../templates/projects/blog/queries/post_by_id.surql");
-
-        let variables = extract_query_variables(QUERY_CONTENT).unwrap();
-
-        assert_eq!(
-            variables,
-            vec![QueryVariables {
-                name: "post_id".to_string(),
-                type_: "&str".to_string()
-            }]
-        );
-    }
-
-    #[test]
-    fn should_extract_multiple_variables_from_comment_mutation() {
-        const QUERY_CONTENT: &str =
-            include_str!("../../templates/projects/blog/mutations/comment.surql");
-
-        let variables = extract_query_variables(QUERY_CONTENT).unwrap();
-
-        assert_eq!(
-            variables,
-            vec![
-                QueryVariables {
-                    name: "user_id".to_string(),
-                    type_: "&str".to_string()
-                },
-                QueryVariables {
-                    name: "post_id".to_string(),
-                    type_: "Option<String>".to_string()
-                },
-                QueryVariables {
-                    name: "comment_id".to_string(),
-                    type_: "Option<String>".to_string()
-                },
-                QueryVariables {
-                    name: "content".to_string(),
-                    type_: "&str".to_string()
-                },
-            ]
         );
     }
 }

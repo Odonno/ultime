@@ -59,5 +59,8 @@ pub enum GenerateAction {
     Endpoint {
         /// Name of the api endpoint to generate
         name: String,
+        /// Use a SurrealDB query to generate the endpoint
+        #[clap(long)]
+        from_query: Option<String>,
     },
 }

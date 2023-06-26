@@ -1,6 +1,42 @@
 use leptos::*;
-
+{% if query %}
+use crate::models::queries::{{ output_type }};
+{% endif %}
 #[server({{ endpoint_name }}, "/api")]
-pub async fn {{ function_name }}() -> Result<(), ServerFnError> {
+pub async fn {{ function_name }}(
+{%- for param in query.params %}
+    {{ param.name }}: {{ param.type_ }},
+{% endfor -%}
+) -> Result<{{ output_type }}, ServerFnError> {
+{%- if query %}
+    use surrealdb::{engine::remote::ws::Ws, Surreal, opt::auth::Root};
+
+    use crate::db::queries::{{ query.short_name }}::{{ query.name }};
+
+    let db = Surreal::new::<Ws>("localhost:8000")
+        .await
+        .map_err(|_| ServerFnError::ServerError("Cannot open connection to SurrealDB".to_string()))?;
+
+    db
+        .signin(Root {
+            username: "root",
+            password: "root",
+        })
+        .await
+        .map_err(|_| ServerFnError::ServerError("Cannot signin to SurrealDB".to_string()))?;
+
+    db
+        .use_ns("test")
+        .use_db("test")
+        .await
+        .map_err(|_| ServerFnError::ServerError("Cannot use namespace and database".to_string()))?;
+
+    let result = {{ query.name }}({{ [['&db'], query.params | map(attribute="name")] | flatten | join(", ") }})
+        .await
+        .map_err(|_| ServerFnError::ServerError("Cannot apply query {{ query.short_name }}".to_string()))?;
+
+    Ok(result)
+{% else %}
     Ok(())
+{% endif -%}
 }

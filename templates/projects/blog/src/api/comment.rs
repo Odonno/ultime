@@ -59,7 +59,7 @@ pub async fn comment(cx: Scope, target: String, content: String) -> Result<(), S
         .await
         .map_err(|_| ServerFnError::ServerError("Cannot use namespace and database".to_string()))?;
 
-    let user_id = "admin";
+    let user_id = "admin".to_string();
 
     let post_id = match &target {
         CommentTarget::BlogPost(id) => Some(id),
@@ -71,15 +71,9 @@ pub async fn comment(cx: Scope, target: String, content: String) -> Result<(), S
         CommentTarget::Comment(id) => Some(id),
     };
 
-    let comment = mutate_comment(
-        &db,
-        user_id,
-        post_id.cloned(),
-        comment_id.cloned(),
-        &content,
-    )
-    .await
-    .map_err(|_| ServerFnError::ServerError("Cannot comment".to_string()))?;
+    let comment = mutate_comment(&db, user_id, post_id.cloned(), comment_id.cloned(), content)
+        .await
+        .map_err(|_| ServerFnError::ServerError("Cannot comment".to_string()))?;
 
     Ok(())
 }
