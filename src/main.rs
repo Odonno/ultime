@@ -1,6 +1,7 @@
 use anyhow::Result;
 use clap::Parser;
 use cli::{Action, GenerateAction};
+use generate::endpoint::GenerateEndpointArgs;
 
 use crate::cli::Args;
 
@@ -21,8 +22,17 @@ async fn main() -> Result<()> {
                 GenerateAction::Db { watch } => generate::db::main(watch),
                 GenerateAction::Component { name } => generate::component::main(name),
                 GenerateAction::Page { name } => generate::page::main(name),
-                GenerateAction::Endpoint { name, from_query } => {
-                    generate::endpoint::main(name, from_query)
+                GenerateAction::Endpoint {
+                    name,
+                    from_query,
+                    from_mutation,
+                } => {
+                    let args = GenerateEndpointArgs {
+                        name,
+                        from_query,
+                        from_mutation,
+                    };
+                    generate::endpoint::main(args)
                 }
             },
         },

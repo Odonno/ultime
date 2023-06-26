@@ -1,17 +1,18 @@
 use leptos::*;
-{% if query %}
-use crate::models::queries::{{ output_type }};
-{% endif %}
+
+use crate::models::mutations::{{ mutation.output_type }};
+
 #[server({{ endpoint_name }}, "/api")]
 pub async fn {{ function_name }}(
-{%- for param in query.params %}
+{%- for param in mutation.params %}
     {{ param.name }}: {{ param.type_ }},
-{% endfor -%}
-) -> Result<{{ output_type }}, ServerFnError> {
-{%- if query %}
+{%- if loop.last %}
+{% endif -%}
+{%- endfor -%}
+) -> Result<{{ mutation.output_type }}, ServerFnError> {
     use surrealdb::{engine::remote::ws::Ws, Surreal, opt::auth::Root};
 
-    use crate::db::queries::{{ query.short_name }}::{{ query.name }};
+    use crate::db::mutations::{{ mutation.short_name }}::{{ mutation.name }};
 
     let db = Surreal::new::<Ws>("localhost:8000")
         .await
@@ -31,12 +32,9 @@ pub async fn {{ function_name }}(
         .await
         .map_err(|_| ServerFnError::ServerError("Cannot use namespace and database".to_string()))?;
 
-    let result = {{ query.name }}({{ [['&db'], query.params | map(attribute="name")] | flatten | join(", ") }})
+    let result = {{ mutation.name }}({{ [['&db'], mutation.params | map(attribute="name")] | flatten | join(", ") }})
         .await
-        .map_err(|_| ServerFnError::ServerError("Cannot apply query {{ query.short_name }}".to_string()))?;
+        .map_err(|_| ServerFnError::ServerError("Cannot apply mutation {{ mutation.short_name }}".to_string()))?;
 
     Ok(result)
-{% else %}
-    Ok(())
-{% endif -%}
 }

@@ -1,0 +1,6 @@
+use leptos::*;
+
+#[server({{ endpoint_name }}, "/api")]
+pub async fn {{ function_name }}() -> Result<(), ServerFnError> {
+    Ok(())
+}
