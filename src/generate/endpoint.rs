@@ -5,6 +5,8 @@ use minijinja::{context, Environment};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
+use crate::cli::GenerateEndpointFromSchemaMethod;
+
 use super::common::{extract_query_variables, QueryVariable};
 
 pub struct GenerateEndpointArgs {
@@ -12,6 +14,8 @@ pub struct GenerateEndpointArgs {
     pub from_query: Option<String>,
     pub from_mutation: Option<String>,
     pub from_event: Option<String>,
+    pub from_schema: Option<String>,
+    pub method: Option<GenerateEndpointFromSchemaMethod>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -28,7 +32,10 @@ enum EndpointTypeGenerated {
     Query(DetailsForEndpoint),
     Mutation(DetailsForEndpoint),
     Event(DetailsForEndpoint),
+    Schema(DetailsForEndpoint),
 }
+
+const DEFAULT_METHOD: GenerateEndpointFromSchemaMethod = GenerateEndpointFromSchemaMethod::List;
 
 pub fn main(args: GenerateEndpointArgs) -> Result<()> {
     let GenerateEndpointArgs {
@@ -36,17 +43,28 @@ pub fn main(args: GenerateEndpointArgs) -> Result<()> {
         from_query,
         from_mutation,
         from_event,
+        from_schema,
+        method,
     } = args;
+
+    let method = method.unwrap_or(DEFAULT_METHOD);
 
     let query = get_query_details_for_endpoint(from_query)?;
     let mutation = get_mutation_details_for_endpoint(from_mutation)?;
     let event = get_event_details_for_endpoint(from_event)?;
+    let schema = get_schema_details_for_endpoint(from_schema, method.clone())?;
 
-    let endpoint_type_generated = match (query.clone(), mutation.clone(), event.clone()) {
-        (None, None, None) => EndpointTypeGenerated::Empty,
-        (Some(query), _, _) => EndpointTypeGenerated::Query(query),
-        (_, Some(mutation), _) => EndpointTypeGenerated::Mutation(mutation),
-        (_, _, Some(event)) => EndpointTypeGenerated::Event(event),
+    let endpoint_type_generated = match (
+        query.clone(),
+        mutation.clone(),
+        event.clone(),
+        schema.clone(),
+    ) {
+        (None, None, None, None) => EndpointTypeGenerated::Empty,
+        (Some(query), _, _, _) => EndpointTypeGenerated::Query(query),
+        (_, Some(mutation), _, _) => EndpointTypeGenerated::Mutation(mutation),
+        (_, _, Some(event), _) => EndpointTypeGenerated::Event(event),
+        (_, _, _, Some(schema)) => EndpointTypeGenerated::Schema(schema),
     };
 
     let src_dir = Path::new("src");
@@ -67,11 +85,16 @@ pub fn main(args: GenerateEndpointArgs) -> Result<()> {
         value.into_iter().flatten().collect::<Vec<_>>()
     }
 
+    fn pascal(value: String) -> String {
+        value.to_case(Case::Pascal)
+    }
+
     env.add_filter("flatten", flatten);
+    env.add_filter("pascal", pascal);
 
     let content = env.render_str(
         &template_content,
-        context! { endpoint_name, function_name, query, mutation, event },
+        context! { endpoint_name, function_name, query, mutation, event, schema, method },
     )?;
 
     let file_name = name.to_case(Case::Snake);
@@ -219,6 +242,95 @@ fn get_event_details_for_endpoint(
     Ok(result)
 }
 
+fn get_schema_details_for_endpoint(
+    from_schema: Option<String>,
+    method: GenerateEndpointFromSchemaMethod,
+) -> Result<Option<DetailsForEndpoint>> {
+    let result = match from_schema {
+        Some(from_schema) => {
+            let schemas_dir = Path::new("schemas");
+
+            let schema_name = get_query_name(from_schema);
+
+            let schema_file_name = format!("{}.surql", schema_name);
+            let schema_file = schemas_dir.join(&schema_file_name);
+
+            if !schema_file.exists() {
+                return Err(anyhow!(format!(
+                    "Schema '{}' does not exist",
+                    schema_file_name
+                )));
+            }
+
+            get_method_prefix(method.clone());
+
+            let schema_type = schema_name.to_case(Case::Pascal);
+
+            let output_type = match method {
+                GenerateEndpointFromSchemaMethod::List => {
+                    format!("Vec<{}>", schema_type)
+                }
+                GenerateEndpointFromSchemaMethod::Find => {
+                    format!("Option<{}>", schema_type)
+                }
+                GenerateEndpointFromSchemaMethod::DeleteAll => {
+                    format!("Vec<{}>", schema_type)
+                }
+                _ => schema_type.to_string(),
+            };
+
+            let short_name = schema_name.to_case(Case::Snake);
+
+            let inner_function_name = match method {
+                GenerateEndpointFromSchemaMethod::List => format!("get_all_{}", short_name),
+                GenerateEndpointFromSchemaMethod::Get => format!("get_{}", short_name),
+                GenerateEndpointFromSchemaMethod::Find => format!("find_{}", short_name),
+                GenerateEndpointFromSchemaMethod::Create => format!("create_{}", short_name),
+                GenerateEndpointFromSchemaMethod::Update => format!("update_{}", short_name),
+                GenerateEndpointFromSchemaMethod::Delete => format!("delete_{}", short_name),
+                GenerateEndpointFromSchemaMethod::DeleteAll => format!("delete_all_{}", short_name),
+            };
+
+            let params = match method {
+                GenerateEndpointFromSchemaMethod::Get => vec![QueryVariable {
+                    name: "id".to_string(),
+                    type_: "&'static str".to_string(),
+                }],
+                GenerateEndpointFromSchemaMethod::Find => vec![QueryVariable {
+                    name: "id".to_string(),
+                    type_: "&'static str".to_string(),
+                }],
+                GenerateEndpointFromSchemaMethod::Create => vec![QueryVariable {
+                    name: "data".to_string(),
+                    type_: schema_type,
+                }],
+                GenerateEndpointFromSchemaMethod::Update => vec![QueryVariable {
+                    name: "data".to_string(),
+                    type_: schema_type,
+                }],
+                GenerateEndpointFromSchemaMethod::Delete => vec![QueryVariable {
+                    name: "data".to_string(),
+                    type_: schema_type,
+                }],
+                _ => vec![],
+            };
+
+            let details = DetailsForEndpoint {
+                name: inner_function_name,
+                short_name,
+                data_type: None,
+                output_type,
+                params,
+            };
+
+            Some(details)
+        }
+        None => None,
+    };
+
+    Ok(result)
+}
+
 fn get_query_name(from: String) -> String {
     let suffixes = [".rs", ".surql"];
 
@@ -237,6 +349,7 @@ fn get_template_name(endpoint_type_generated: EndpointTypeGenerated) -> String {
         EndpointTypeGenerated::Query(_) => "query",
         EndpointTypeGenerated::Mutation(_) => "mutation",
         EndpointTypeGenerated::Event(_) => "event",
+        EndpointTypeGenerated::Schema(_) => "schema",
     };
 
     format!("endpoint.{}.rs.jinja2", sub_template_name)
@@ -253,4 +366,16 @@ fn get_template(template_name: String) -> Result<String> {
         .to_string();
 
     Ok(template_content)
+}
+
+fn get_method_prefix(method: GenerateEndpointFromSchemaMethod) -> &'static str {
+    match method {
+        GenerateEndpointFromSchemaMethod::List => "list",
+        GenerateEndpointFromSchemaMethod::Get => "get",
+        GenerateEndpointFromSchemaMethod::Find => "find",
+        GenerateEndpointFromSchemaMethod::Create => "create",
+        GenerateEndpointFromSchemaMethod::Update => "update",
+        GenerateEndpointFromSchemaMethod::Delete => "delete",
+        GenerateEndpointFromSchemaMethod::DeleteAll => "delete_all",
+    }
 }

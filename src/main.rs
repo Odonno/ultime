@@ -27,12 +27,16 @@ async fn main() -> Result<()> {
                     from_query,
                     from_mutation,
                     from_event,
+                    from_schema,
+                    method,
                 } => {
                     let args = GenerateEndpointArgs {
                         name,
                         from_query,
                         from_mutation,
                         from_event,
+                        from_schema,
+                        method,
                     };
                     generate::endpoint::main(args)
                 }

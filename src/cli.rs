@@ -1,4 +1,5 @@
 use clap::{Parser, Subcommand, ValueEnum};
+use serde::{Deserialize, Serialize};
 
 #[derive(Parser, Debug)]
 #[clap(name = "ultime", version, author = "Odonno")]
@@ -35,6 +36,17 @@ pub enum Action {
     },
 }
 
+#[derive(ValueEnum, Debug, Clone, Serialize, Deserialize)]
+pub enum GenerateEndpointFromSchemaMethod {
+    List,
+    Get,
+    Find,
+    Create,
+    Update,
+    Delete,
+    DeleteAll,
+}
+
 #[derive(Subcommand, Debug)]
 pub enum GenerateAction {
     /// Generate `db` module inside the `/db` folder
@@ -60,13 +72,19 @@ pub enum GenerateAction {
         /// Name of the api endpoint to generate
         name: String,
         /// Use a SurrealDB query from `/queries` to generate the endpoint
-        #[clap(long, conflicts_with_all(&["from_mutation", "from_event"]))]
+        #[clap(long, conflicts_with_all(&["from_mutation", "from_event", "from_schema"]))]
         from_query: Option<String>,
         /// Use a SurrealDB query from `/mutations` to generate the endpoint
-        #[clap(long, conflicts_with_all(&["from_query", "from_event"]))]
+        #[clap(long, conflicts_with_all(&["from_query", "from_event", "from_schema"]))]
         from_mutation: Option<String>,
         /// Use a SurrealDB query from `/events` to generate the endpoint
-        #[clap(long, conflicts_with_all(&["from_query", "from_mutation"]))]
+        #[clap(long, conflicts_with_all(&["from_query", "from_mutation", "from_schema"]))]
         from_event: Option<String>,
+        /// Use a SurrealDB query from `/schemas` to generate the endpoint
+        #[clap(long, conflicts_with_all(&["from_query", "from_mutation", "from_event"]))]
+        from_schema: Option<String>,
+        /// Method to use for the generated endpoint from schema
+        #[clap(long)]
+        method: Option<GenerateEndpointFromSchemaMethod>,
     },
 }
