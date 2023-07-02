@@ -25,6 +25,7 @@ use super::common::{extract_query_variables, QueryVariable};
 enum SurrealType {
     Id,
     String,
+    Array(Box<SurrealType>),
     Unknown,
 }
 
@@ -539,14 +540,18 @@ fn extract_struct_fields(
         struct_fields.insert("id".to_string(), SurrealType::Id);
     }
 
-    for define_field_statement in define_field_statements {
+    for define_field_statement in &define_field_statements {
         let field_name = define_field_statement.name.to_string();
-        // TODO : Handle other field types
-        let field_type = match define_field_statement.kind {
-            Some(Kind::String) => SurrealType::String,
-            Some(Kind::Record(_)) => SurrealType::Id,
-            _ => SurrealType::Unknown,
-        };
+
+        if field_name.contains("[*]") {
+            continue;
+        }
+
+        let field_type = get_surreal_type(
+            define_field_statement,
+            &field_name,
+            &define_field_statements,
+        );
 
         struct_fields.insert(field_name, field_type);
     }
@@ -555,19 +560,57 @@ fn extract_struct_fields(
         .iter()
         .sorted_by_key(|(field_name, _)| field_name.to_string())
         .map(|(field_name, field_type)| {
-            let type_str = match field_type {
-                SurrealType::Id => "Thing",
-                SurrealType::String => "String",
-                SurrealType::Unknown => "String", // TODO : What to do here?
-            };
+            let type_str = get_output_type(field_type);
 
             StructField {
                 name: field_name.to_string(),
-                type_str: type_str.to_string(),
+                type_str,
             }
         })
         .collect::<Vec<_>>();
     struct_fields
+}
+
+fn get_surreal_type(
+    current_define_field_statement: &DefineFieldStatement,
+    field_name: &String,
+    define_field_statements: &[DefineFieldStatement],
+) -> SurrealType {
+    // TODO : Handle other field types
+
+    match current_define_field_statement.kind {
+        Some(Kind::String) => SurrealType::String,
+        Some(Kind::Record(_)) => SurrealType::Id,
+        Some(Kind::Array) => {
+            let inner_field_name = format!("{}[*]", field_name);
+
+            let inner_field_statement = &define_field_statements
+                .iter()
+                .find(|statement| statement.name.to_string() == inner_field_name);
+
+            match inner_field_statement {
+                Some(inner_field_statement) => {
+                    let inner_type = get_surreal_type(
+                        inner_field_statement,
+                        &inner_field_name,
+                        define_field_statements,
+                    );
+                    SurrealType::Array(Box::new(inner_type))
+                }
+                None => SurrealType::Array(Box::new(SurrealType::Unknown)),
+            }
+        }
+        _ => SurrealType::Unknown,
+    }
+}
+
+fn get_output_type(field_type: &SurrealType) -> String {
+    match field_type {
+        SurrealType::Id => "Thing".to_string(),
+        SurrealType::String => "String".to_string(),
+        SurrealType::Array(nested_type) => format!("Vec<{}>", get_output_type(nested_type)),
+        SurrealType::Unknown => "String".to_string(), // TODO : What to do here?
+    }
 }
 
 fn generate_from_crud_template(
@@ -918,6 +961,55 @@ pub async fn query_posts<C: Connection>(
             },
             StructField {
                 name: "title".to_string(),
+                type_str: "String".to_string(),
+            },
+        ];
+
+        assert_eq!(struct_fields, result);
+    }
+
+    #[test]
+    fn extract_struct_fields_with_array() {
+        let query = surrealdb::sql::parse("DEFINE FIELD username ON user TYPE string ASSERT $value != NONE;
+DEFINE FIELD email ON user TYPE string ASSERT is::email($value);
+DEFINE FIELD password ON user TYPE string ASSERT $value != NONE;
+DEFINE FIELD registered_at ON user TYPE datetime VALUE $before OR time::now();
+DEFINE FIELD avatar ON user TYPE string;
+
+DEFINE FIELD permissions ON user TYPE array VALUE [permission:create_post, permission:create_comment];
+DEFINE FIELD permissions.* ON user TYPE record (permission);").unwrap();
+        let statements = query.0 .0;
+
+        let define_field_statements = extract_define_field_statements(statements);
+
+        let struct_fields = extract_struct_fields(define_field_statements, true);
+        let result = vec![
+            StructField {
+                name: "avatar".to_string(),
+                type_str: "String".to_string(),
+            },
+            StructField {
+                name: "email".to_string(),
+                type_str: "String".to_string(),
+            },
+            StructField {
+                name: "id".to_string(),
+                type_str: "Thing".to_string(),
+            },
+            StructField {
+                name: "password".to_string(),
+                type_str: "String".to_string(),
+            },
+            StructField {
+                name: "permissions".to_string(),
+                type_str: "Vec<Thing>".to_string(),
+            },
+            StructField {
+                name: "registered_at".to_string(),
+                type_str: "String".to_string(),
+            },
+            StructField {
+                name: "username".to_string(),
                 type_str: "String".to_string(),
             },
         ];
