@@ -1,6 +1,7 @@
 use anyhow::{Context, Result};
 use convert_case::{Case, Casing};
 use include_dir::{include_dir, Dir};
+use itertools::Itertools;
 use minijinja::{context, Environment};
 use notify::{
     event::{AccessKind, AccessMode},
@@ -27,7 +28,7 @@ enum SurrealType {
     Unknown,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 struct StructField {
     name: String,
     type_str: String,
@@ -552,6 +553,7 @@ fn extract_struct_fields(
 
     let struct_fields = struct_fields
         .iter()
+        .sorted_by_key(|(field_name, _)| field_name.to_string())
         .map(|(field_name, field_type)| {
             let type_str = match field_type {
                 SurrealType::Id => "Thing",
@@ -859,5 +861,67 @@ pub async fn query_posts<C: Connection>(
     Ok(result)
 }"
         );
+    }
+
+    #[test]
+    fn extract_empty_struct_fields() {
+        let struct_fields = extract_struct_fields(vec![], false);
+        let result = vec![];
+
+        assert_eq!(struct_fields, result);
+    }
+
+    #[test]
+    fn extract_empty_struct_fields_with_id() {
+        let struct_fields = extract_struct_fields(vec![], true);
+        let result = vec![StructField {
+            name: "id".to_string(),
+            type_str: "Thing".to_string(),
+        }];
+
+        assert_eq!(struct_fields, result);
+    }
+
+    #[test]
+    fn extract_multiple_struct_fields_with_id() {
+        let define_field_statements: Vec<DefineFieldStatement> = vec![
+            DefineFieldStatement {
+                name: "name".to_string().into(),
+                kind: Some(Kind::String),
+                ..Default::default()
+            },
+            DefineFieldStatement {
+                name: "title".to_string().into(),
+                kind: Some(Kind::String),
+                ..Default::default()
+            },
+            DefineFieldStatement {
+                name: "content".to_string().into(),
+                kind: Some(Kind::String),
+                ..Default::default()
+            },
+        ];
+
+        let struct_fields = extract_struct_fields(define_field_statements, true);
+        let result = vec![
+            StructField {
+                name: "content".to_string(),
+                type_str: "String".to_string(),
+            },
+            StructField {
+                name: "id".to_string(),
+                type_str: "Thing".to_string(),
+            },
+            StructField {
+                name: "name".to_string(),
+                type_str: "String".to_string(),
+            },
+            StructField {
+                name: "title".to_string(),
+                type_str: "String".to_string(),
+            },
+        ];
+
+        assert_eq!(struct_fields, result);
     }
 }

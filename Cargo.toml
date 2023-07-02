@@ -19,6 +19,7 @@ clap = { version = "4.3.0", features = ["derive"] }
 convert_case = "0.6.0"
 fs_extra = "1.3.0"
 include_dir = "0.7.3"
+itertools = "0.11.0"
 minijinja = "0.34.0"
 notify = "6.0.0"
 open = "4.1.0"
