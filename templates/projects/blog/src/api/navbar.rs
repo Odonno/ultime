@@ -1,11 +1,12 @@
 use leptos::*;
 
-#[server(UnpublishPost, "/api")]
-pub async fn unpublish_post(cx: Scope, post_id: String) -> Result<(), ServerFnError> {
-    use serde::{Deserialize, Serialize};
-    use surrealdb::{engine::remote::ws::Ws, opt::auth::Root, sql::Thing, Surreal};
+use crate::models::queries::NavbarQueryItem;
 
-    use crate::db::events::unpublish_post::UnpublishPostData;
+#[server(FetchNavbar, "/api")]
+pub async fn fetch_navbar(cx: Scope) -> Result<NavbarQueryItem, ServerFnError> {
+    use surrealdb::{engine::remote::ws::Ws, opt::auth::Root, Surreal};
+
+    use crate::db::queries::navbar::query_navbar;
 
     let request = expect_context::<actix_web::HttpRequest>(cx);
 
@@ -31,13 +32,14 @@ pub async fn unpublish_post(cx: Scope, post_id: String) -> Result<(), ServerFnEr
         .await
         .map_err(|_| ServerFnError::ServerError("Cannot authenticate".to_string()))?;
 
-    let data = UnpublishPostData {
-        post_id: ("post".to_string(), post_id.to_string()).into(),
-    };
-
-    crate::db::events::unpublish_post::unpublish_post(&db, data)
+    let result = query_navbar(&db)
         .await
-        .map_err(|_| ServerFnError::ServerError("Cannot unpublish post".to_string()))?;
+        .map_err(|_| ServerFnError::ServerError("Cannot query navbar".to_string()))?;
 
-    Ok(())
+    let result = result
+        .first()
+        .cloned()
+        .ok_or(ServerFnError::ServerError("Cannot get navbar".to_string()))?;
+
+    Ok(result)
 }

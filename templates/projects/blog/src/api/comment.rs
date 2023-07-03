@@ -43,23 +43,29 @@ pub async fn comment(cx: Scope, target: String, content: String) -> Result<(), S
 
     let target = parse_target(target);
 
+    let request = expect_context::<actix_web::HttpRequest>(cx);
+
+    let token = request
+        .cookie("access_token")
+        .and_then(|cookie| {
+            let binding = cookie.clone();
+            let value = binding.value();
+            Some(value.to_string())
+        })
+        .ok_or(ServerFnError::ServerError("Cannot get token".to_string()))?;
+
     let db = Surreal::new::<Ws>("localhost:8000").await.map_err(|_| {
         ServerFnError::ServerError("Cannot open connection to SurrealDB".to_string())
     })?;
-
-    db.signin(Root {
-        username: "root",
-        password: "root",
-    })
-    .await
-    .map_err(|_| ServerFnError::ServerError("Cannot signin to SurrealDB".to_string()))?;
 
     db.use_ns("test")
         .use_db("test")
         .await
         .map_err(|_| ServerFnError::ServerError("Cannot use namespace and database".to_string()))?;
 
-    let user_id = "admin".to_string();
+    db.authenticate(token)
+        .await
+        .map_err(|_| ServerFnError::ServerError("Cannot authenticate".to_string()))?;
 
     let post_id = match &target {
         CommentTarget::BlogPost(id) => Some(id),
@@ -71,7 +77,7 @@ pub async fn comment(cx: Scope, target: String, content: String) -> Result<(), S
         CommentTarget::Comment(id) => Some(id),
     };
 
-    let comment = mutate_comment(&db, user_id, post_id.cloned(), comment_id.cloned(), content)
+    let comment = mutate_comment(&db, post_id.cloned(), comment_id.cloned(), content)
         .await
         .map_err(|_| ServerFnError::ServerError("Cannot comment".to_string()))?;
 

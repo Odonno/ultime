@@ -4,6 +4,7 @@ use cfg_if::cfg_if;
 
 pub mod api;
 pub mod app;
+mod components;
 mod db;
 mod models;
 mod pages;

@@ -6,6 +6,7 @@ use thiserror::Error;
 
 use crate::{
     api::{fetch_post_details, publish_post, unpublish_post, CommentPostOrComment, CommentTarget},
+    components::navbar::Navbar,
     models::queries::{PostByIdQueryComments, PostByIdQueryItem},
 };
 
@@ -61,6 +62,8 @@ pub fn PostDetailsPage(cx: Scope) -> impl IntoView {
 
     view! {
         cx,
+        <Navbar />
+
         <Suspense fallback=move || view! { cx, <p>"Loading..."</p> }>
             <ErrorBoundary fallback=|cx, errors| {
                 view! { cx,
@@ -117,7 +120,7 @@ pub fn BlogPost(
                 if is_draft {
                     let publish_closure = move |post_id| {
                         spawn_local(async move {
-                            let _ = publish_post(post_id).await;
+                            let _ = publish_post(cx, post_id).await;
                             fetch_post_details.refetch();
                         });
                     };
@@ -131,7 +134,7 @@ pub fn BlogPost(
                 } else {
                     let unpublish_closure = move |post_id| {
                         spawn_local(async move {
-                            let _ = unpublish_post(post_id).await;
+                            let _ = unpublish_post(cx, post_id).await;
                             fetch_post_details.refetch();
                         });
                     };

@@ -4,6 +4,9 @@ use leptos_router::*;
 
 use crate::pages::home::HomePage;
 use crate::pages::post::PostDetailsPage;
+use crate::pages::sign_in::SignInPage;
+use crate::pages::sign_out::SignOutPage;
+use crate::pages::sign_up::SignUpPage;
 
 #[component]
 pub fn App(cx: Scope) -> impl IntoView {
@@ -26,6 +29,9 @@ pub fn App(cx: Scope) -> impl IntoView {
                 <Routes>
                     <Route path="" view=|cx| view! { cx, <HomePage/> }/>
                     <Route path="/posts/:id" view=|cx| view! { cx, <PostDetailsPage/> }/>
+                    <Route path="/sign_up" view=|cx| view! { cx, <SignUpPage/> }/>
+                    <Route path="/sign_in" view=|cx| view! { cx, <SignInPage/> }/>
+                    <Route path="/sign_out" view=|cx| view! { cx, <SignOutPage/> }/>
                 </Routes>
             </main>
         </Router>

@@ -91,12 +91,18 @@ pub mod queries;",
 
             let crud_files = crud_dir.read_dir()?;
             let crud_files = crud_files.collect::<Result<Vec<_>, _>>()?;
-            assert_eq!(crud_files.len(), 4);
+            assert_eq!(crud_files.len(), 5);
 
             let crud_file_names = crud_files.iter().map(|f| f.file_name()).collect::<Vec<_>>();
             assert_eq!(
                 crud_file_names,
-                vec!["user.rs", "comment.rs", "script_migration.rs", "post.rs"]
+                vec![
+                    "permission.rs",
+                    "user.rs",
+                    "comment.rs",
+                    "script_migration.rs",
+                    "post.rs",
+                ]
             );
         }
 
@@ -139,13 +145,16 @@ pub mod queries;",
 
             let queries_files = queries_dir.read_dir()?;
             let queries_files = queries_files.collect::<Result<Vec<_>, _>>()?;
-            assert_eq!(queries_files.len(), 2);
+            assert_eq!(queries_files.len(), 3);
 
             let queries_file_names = queries_files
                 .iter()
                 .map(|f| f.file_name())
                 .collect::<Vec<_>>();
-            assert_eq!(queries_file_names, vec!["posts.rs", "post_by_id.rs"]);
+            assert_eq!(
+                queries_file_names,
+                vec!["posts.rs", "post_by_id.rs", "navbar.rs"]
+            );
         }
     }
 

@@ -524,6 +524,9 @@ use leptos_router::*;
 
 use crate::pages::home::HomePage;
 use crate::pages::post::PostDetailsPage;
+use crate::pages::sign_in::SignInPage;
+use crate::pages::sign_out::SignOutPage;
+use crate::pages::sign_up::SignUpPage;
 
 #[component]
 pub fn App(cx: Scope) -> impl IntoView {
@@ -546,6 +549,9 @@ pub fn App(cx: Scope) -> impl IntoView {
                 <Routes>
                     <Route path="" view=|cx| view! { cx, <HomePage/> }/>
                     <Route path="/posts/:id" view=|cx| view! { cx, <PostDetailsPage/> }/>
+                    <Route path="/sign_up" view=|cx| view! { cx, <SignUpPage/> }/>
+                    <Route path="/sign_in" view=|cx| view! { cx, <SignInPage/> }/>
+                    <Route path="/sign_out" view=|cx| view! { cx, <SignOutPage/> }/>
                 </Routes>
             </main>
         </Router>
@@ -571,8 +577,11 @@ async fn main() -> std::io::Result<()> {
     use actix_web::*;
     use leptos::*;
     use leptos_actix::{generate_route_list, LeptosRoutes};
+    use my_blog::api::{
+        CommentPostOrComment, CreateBlogPost, FetchBlogPosts, FetchNavbar, FetchPostDetails,
+        PublishPost, SignIn, SignOut, SignUp, UnpublishPost,
+    };
     use my_blog::app::*;
-    use my_blog::api::{CommentPostOrComment, CreateBlogPost, FetchBlogPosts, FetchPostDetails, PublishPost, UnpublishPost};
 
     let conf = get_configuration(None).await.unwrap();
     let addr = conf.leptos_options.site_addr;
@@ -585,6 +594,10 @@ async fn main() -> std::io::Result<()> {
     let _ = PublishPost::register();
     let _ = UnpublishPost::register();
     let _ = CommentPostOrComment::register();
+    let _ = SignUp::register();
+    let _ = SignIn::register();
+    let _ = SignOut::register();
+    let _ = FetchNavbar::register();
 
     HttpServer::new(move || {
         let leptos_options = &conf.leptos_options;
@@ -618,8 +631,8 @@ pub fn main() {
     // prefer using `cargo leptos serve` instead
     // to run: `trunk serve --open --features ssg`
     use leptos::*;
-    use my_blog::app::*;
     use wasm_bindgen::prelude::wasm_bindgen;
+    use my_blog::app::*;
 
     console_error_panic_hook::set_once();
 

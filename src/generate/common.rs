@@ -72,10 +72,6 @@ mod tests {
             variables,
             vec![
                 QueryVariable {
-                    name: "user_id".to_string(),
-                    type_: "String".to_string()
-                },
-                QueryVariable {
                     name: "post_id".to_string(),
                     type_: "Option<String>".to_string()
                 },

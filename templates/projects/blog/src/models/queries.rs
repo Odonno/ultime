@@ -32,3 +32,11 @@ pub struct PostByIdQueryItem {
 }
 
 pub type PostByIdQuery = Vec<PostByIdQueryItem>;
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct NavbarQueryItem {
+    pub username: String,
+    pub avatar: String,
+}
+
+pub type NavbarQuery = Vec<NavbarQueryItem>;

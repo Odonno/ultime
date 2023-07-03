@@ -1,0 +1,1 @@
+SELECT username, avatar FROM $auth;

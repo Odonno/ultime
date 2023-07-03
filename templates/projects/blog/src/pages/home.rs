@@ -3,6 +3,7 @@ use leptos_router::*;
 
 use crate::{
     api::{fetch_blog_posts, CreateBlogPost},
+    components::navbar::Navbar,
     models::queries::PostsQueryItem,
 };
 
@@ -31,6 +32,8 @@ pub fn HomePage(cx: Scope) -> impl IntoView {
 
     view! {
         cx,
+        <Navbar />
+
         <header class="post-list-header">
             <h1>"Welcome to my blog!"</h1>
         </header>
@@ -90,7 +93,7 @@ pub fn BlogPosts(
 
 #[component]
 pub fn BlogPost(cx: Scope, post: PostsQueryItem) -> impl IntoView {
-    let href = format!("posts/{}", post.id);
+    let href = format!("/posts/{}", post.id);
 
     view! {
         cx,

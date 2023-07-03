@@ -14,19 +14,12 @@ pub async fn fetch_post_details(
         ServerFnError::ServerError("Cannot open connection to SurrealDB".to_string())
     })?;
 
-    db.signin(Root {
-        username: "root",
-        password: "root",
-    })
-    .await
-    .map_err(|_| ServerFnError::ServerError("Cannot signin to SurrealDB".to_string()))?;
-
     db.use_ns("test")
         .use_db("test")
         .await
         .map_err(|_| ServerFnError::ServerError("Cannot use namespace and database".to_string()))?;
 
-    let post = query_post_by_id(&db, &post_id)
+    let post = query_post_by_id(&db, post_id)
         .await
         .map_err(|_| ServerFnError::ServerError("Cannot get post details".to_string()))?;
 

@@ -77,7 +77,6 @@ use crate::models::mutations::CommentMutation;
 
 #[server(Comment, "/api")]
 pub async fn comment(
-    user_id: String,
     post_id: Option<String>,
     comment_id: Option<String>,
     content: String,
@@ -104,7 +103,7 @@ pub async fn comment(
         .await
         .map_err(|_| ServerFnError::ServerError("Cannot use namespace and database".to_string()))?;
 
-    let result = mutate_comment(&db, user_id, post_id, comment_id, content)
+    let result = mutate_comment(&db, post_id, comment_id, content)
         .await
         .map_err(|_| ServerFnError::ServerError("Cannot apply mutation comment".to_string()))?;
 
