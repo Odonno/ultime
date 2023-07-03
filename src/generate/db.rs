@@ -108,6 +108,7 @@ pub fn generate_db_folder() -> Result<()> {
 
             let queries_mod_file_content = queries_to_generate
                 .keys()
+                .sorted()
                 .map(|table_name| format!("pub mod {};", table_name))
                 .collect::<Vec<_>>()
                 .join("\n");
@@ -173,6 +174,7 @@ pub fn generate_db_folder() -> Result<()> {
 
             let mutations_mod_file_content = mutations_to_generate
                 .keys()
+                .sorted()
                 .map(|table_name| format!("pub mod {};", table_name))
                 .collect::<Vec<_>>()
                 .join("\n");
@@ -249,6 +251,7 @@ pub fn generate_db_folder() -> Result<()> {
 
             let crud_mod_file_content = schemas_to_generate
                 .keys()
+                .sorted()
                 .map(|table_name| format!("pub mod {};", table_name))
                 .collect::<Vec<_>>()
                 .join("\n");
@@ -343,6 +346,7 @@ pub fn generate_db_folder() -> Result<()> {
 
             let events_mod_file_content = events_to_generate
                 .keys()
+                .sorted()
                 .map(|table_name| format!("pub mod {};", table_name))
                 .collect::<Vec<_>>()
                 .join("\n");
