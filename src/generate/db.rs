@@ -5,7 +5,7 @@ use itertools::Itertools;
 use minijinja::{context, Environment};
 use notify::{
     event::{AccessKind, AccessMode},
-    EventKind, INotifyWatcher, RecursiveMode, Watcher,
+    EventKind, RecommendedWatcher, RecursiveMode, Watcher,
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -393,7 +393,7 @@ pub fn generate_db_folder() -> Result<()> {
     Ok(())
 }
 
-pub fn watch_to_regenerate_db_folder() -> Result<INotifyWatcher> {
+pub fn watch_to_regenerate_db_folder() -> Result<RecommendedWatcher> {
     fn watch_event(result: notify::Result<notify::Event>) {
         match result {
             Ok(event) => {
@@ -415,7 +415,7 @@ pub fn watch_to_regenerate_db_folder() -> Result<INotifyWatcher> {
         }
     }
 
-    let mut watcher = notify::recommended_watcher(watch_event)?;
+    let mut watcher: RecommendedWatcher = notify::recommended_watcher(watch_event)?;
 
     let schemas_dir = Path::new("schemas");
     if schemas_dir.exists() {
